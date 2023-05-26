@@ -1,0 +1,2018 @@
+package com.cebserv.nboss.engineer.controller;
+
+import com.alibaba.druid.support.spring.stat.SpringStatUtils;
+import com.cebserv.nboss.account.engineer.service.EbEngineerService;
+import com.cebserv.nboss.boss3.purchase.dto.GeProductInfoVO;
+import com.cebserv.nboss.boss3.purchase.dto.UuEnterpriseInfo;
+import com.cebserv.nboss.boss3.purchase.service.LazyGeProductInfoVODataModel;
+import com.cebserv.nboss.boss3.purchase.service.LazyUuEnterpriseInfoDataModel;
+import com.cebserv.nboss.boss3.purchase.service.UuEnterpriseInfoService;
+import com.cebserv.nboss.engineer.brandcert.service.SystemService;
+import com.cebserv.nboss.engineer.service.EbEngineerSpecialStatusRecordService;
+import com.cebserv.nboss.entity.*;
+import com.cebserv.nboss.kafka.MessageConstants;
+import com.cebserv.nboss.mission.manage.service.XgPushService;
+import com.cebserv.nboss.qoOrder.service.QoOrderService;
+import com.cebserv.nboss.qoOrderSchedule.service.QoOrderScheduleService;
+import com.cebserv.nboss.service.AuthUserBaseService;
+import com.cebserv.nboss.service.UserPrincipal;
+import com.cebserv.nboss.utils.*;
+import org.json.JSONObject;
+import org.primefaces.PrimeFaces;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronizationAdapter;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.util.StringUtils;
+import org.springframework.web.context.annotation.SessionScope;
+
+import javax.annotation.PostConstruct;
+import javax.annotation.Resource;
+import javax.inject.Named;
+import java.math.BigDecimal;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+/**
+ * @program: springbootjsf
+ * @description:
+ * @author: fengmj
+ * @create: 2019-10-21 09:53
+ **/
+@Named
+@SessionScope
+public class EbEngineerListController {
+    private Logger log=LoggerFactory.getLogger(EbEngineerListController.class);
+
+    @Autowired
+    EbEngineerService ebEngineerService;
+    @Autowired
+    QoOrderService qoOrderService;
+    @Autowired
+    UserPrincipal userPrincipal;
+    @Autowired
+    AuthUserBaseService authUserBaseService;
+    @Autowired
+    QoOrderScheduleService qoOrderScheduleService;
+    @Autowired
+    XgPushService xgPushService;
+    @Autowired
+    private BusinessConfigSum businessConfigSum;
+    @Autowired
+    EbEngineerSpecialStatusRecordService ebEngineerSpecialStatusRecordService;
+    @Autowired
+    SystemService systemService;
+    @Autowired
+    private XingePushUtil xingePushUtil;
+    @Resource
+    private KafkaTemplate<String, Object> kafkaTemplate;
+    @Autowired
+    private UuEnterpriseInfoService uuEnterpriseInfoService;
+
+    private SMSVerificationService smsVerificationService;
+    //工程师-列表
+    private LazyEbEngineerListDataModel ebEngineerList;
+    //工程师-列表选择
+    //private List<EbEngineerEntity> selectEbEngineerList;
+    private EbEngineerEntity selectEbEngineerList;
+    //查询
+    private EbEngineerEntity ebEngineer;
+    private Integer[] domains;//技能领域
+    private Integer[] certs;//资质证书
+    private String[] contractLabel;//合同标签
+    //接单省市区
+    private Integer regionProvinceId;
+    private Integer regionCityId;
+    private Integer regionDistrictId;
+    //工程师-省份
+    private List<GaProvinceEntity> gaProvinceList;
+    //工程师-城市
+    private List<GaCityEntity> gaCityList;
+    //工程师-城市
+    private List<GaDistrictEntity> gaDistrictList;
+    //工程师信息-新建
+    private EbEngineerEntity ebEngineerCreate = new EbEngineerEntity();
+    //工程师信息-编辑
+    private EbEngineerEntity ebEngineerEdit = new EbEngineerEntity();
+    //会员等级
+    private List<WeLevelEntity> weLevelEntityList;
+
+    //工程师-密码
+    private String password;
+    //工程师-真实姓名
+    private String realName;
+    //工程师-手机号
+    private String phoneNumber;
+    //工程师-账户余额
+    private String money;
+    //工程师-身份证号
+    private String idCard;
+    //查看队员-列表
+    private List<EbEngineerEntity> ebEngineerTeamList;
+    //选择
+    private List<EbEngineerEntity> selectEbEngineerTeamList;
+    //审核教育背景
+    private EbEduBackgroundEntity ebEduBackgroundEntity = new EbEduBackgroundEntity();
+    //审核教育背景状态
+    private Integer status;
+    //展示审核状态
+    private String verifyStatus = null;
+    private String id;
+    private String flag;
+    //工程师不可接单原因
+    private String acceptableNotReason;
+    //展示工程师审核照片信息
+    private EbEngineerEntity showEbEngineer=new EbEngineerEntity();
+    //审核工程师审核照片不通过原因
+    private String notPassReason;
+    //设置不通过原因是否填写
+    private boolean enableShow=true;
+    //设置审核状态
+    private Integer realNameVerification;
+    //工程师设置特殊状态
+    private EbEngineerSpecialStatusRecord ebEngineerSpecialStatusRecord=new EbEngineerSpecialStatusRecord();
+    //添加特殊是否可点击
+    private boolean addEnableClick=true;
+    //移除特殊状态是否可点击
+    private boolean removeEnableClick=true;
+
+    //按钮是否可点击
+    private boolean buttonClick=true;
+    //设为领主
+    private String leaderCompany;
+
+    //添加工程师备注
+    private EbEngineerRemark ebEngineerRemark=new EbEngineerRemark();
+
+    //企业信息列表
+    private LazyUuEnterpriseInfoDataModel uuEnterpriseInfoList;
+    //企业信息选择
+    private UuEnterpriseInfo selectUuEnterpriseInfo = new UuEnterpriseInfo();
+    //企业信息搜索
+    private UuEnterpriseInfo searchUuEnterpriseInfo = new UuEnterpriseInfo();
+    //企业信息增加
+    private UuEnterpriseInfo createUuEnterpriseInfo = new UuEnterpriseInfo();
+    //天眼查-查询公司名称
+    private String searchCompany = null;
+
+
+    //按钮是否展示
+    //有ROLE_CODE_ENGINEER_LIST_VIEW权限的除下面按钮外，其余按钮不展示
+    //工程师信息界面保留查询、查看团员、查看详细资料
+    //有ROLE_CODE_BOSS_ENGINEER权限的，可以有所有按钮
+    private boolean isShowBtn = false;
+
+    @PostConstruct
+    public void init() {
+        query();
+        gaProvinceLists();
+        weLevelEntities();
+        ebEngineerCreate.setEngineerType(1);
+        if(userPrincipal.isUserInRole(DictionaryCodeConst.ROLE_CODE_BOSS_ENGINEER)){
+            isShowBtn = true;
+        }else{
+            if (userPrincipal.isUserInRole(DictionaryCodeConst.ROLE_CODE_FUNCTION_VIEW)) {
+                isShowBtn = false;
+            }
+        }
+    }
+
+    public String getId() {
+        String ids = JsfUtil.getRequestParameter("engineerId");
+        String flags = JsfUtil.getRequestParameter("flag");
+        if (!StringUtils.isEmpty(ids)) {
+            ebEngineerCreate = ebEngineerService.findById(Integer.valueOf(ids));
+            password = ebEngineerCreate.getDecryptPassword();
+            money = ebEngineerCreate.getDecryptMoney();
+            realName = ebEngineerCreate.getDecryptRealName();
+            phoneNumber = ebEngineerCreate.getDecryptMobiletel();
+            idCard = EncryptUtil.decrypt(ebEngineerCreate.getIdcard());
+            setId(ids);
+        }
+        if (!StringUtils.isEmpty(flags)) {
+            flag = flags;
+        }
+        return id;
+    }
+
+    public void setId(String id) {
+        this.id = id;
+    }
+
+    public LazyEbEngineerListDataModel getEbEngineerList() {
+        return ebEngineerList;
+    }
+
+    public void query() {
+        if (ebEngineer == null) {
+            ebEngineer = new EbEngineerEntity();
+        }
+        ebEngineerList = new LazyEbEngineerListDataModel(ebEngineer, regionProvinceId, regionCityId, regionDistrictId, domains, certs,contractLabel, ebEngineerService,true);
+    }
+
+    //保存或者编辑工程师基本信息
+    @Transactional
+    public String saveOrUpdateEngineerInfo() {
+        if(StringUtils.hasLength(ebEngineerCreate.getCompany())
+                && ebEngineerCreate.getEngineerType()!=null && ebEngineerCreate.getEngineerType() == 4
+        ){
+            List<EbEngineerEntity> engineer = ebEngineerService.selectEngineerByCompany(ebEngineerCreate.getCompany(),ebEngineerCreate.getId());
+            if(engineer!=null && engineer.size()>0){
+                JsfUtil.addErrorMessage("该公司已被绑定");
+                return "400";
+            }
+        }
+        if (ebEngineerCreate.getId() == null) {
+            doAdd();
+        } else {
+            //doUpdate();
+            doUpdateTest();
+        }
+        return "200";
+    }
+
+    /**
+     * 更新工程师基本信息
+     */
+    @Transactional
+    public String doUpdate() {
+        //message = "工程师基本信息更新成功";
+        EbEngineerEntity t = ebEngineerCreate;
+        EbEngineerEntity ebEngineer = ebEngineerService.findById(t.getId());
+        String optUserId = authUserBaseService.findBaseUserIdByLoginName(userPrincipal.getName());
+        String optUserName = userPrincipal.getName();
+        if (realName != null && !realName.isEmpty()) {
+            ebEngineerCreate.setRealname(EncryptUtil.encrypt(realName));
+            ebEngineerCreate.setRealnameCode(realName);
+        }
+        ebEngineerCreate.setPassword(EncryptUtil.encrypt(password));
+        if (idCard != null && !idCard.isEmpty()) {
+            ebEngineerCreate.setIdcard(EncryptUtil.encrypt(idCard));
+            ebEngineerCreate.setIdcardCode(idCard);
+        }
+        if (phoneNumber != null && !phoneNumber.isEmpty()) {
+            ebEngineerCreate.setMobileTel(EncryptUtil.encrypt(phoneNumber));
+            ebEngineerCreate.setMobiletelCode(phoneNumber);
+        }
+        if (ebEngineerCreate.getEngineerType()!=null&&4 == ebEngineerCreate.getEngineerType()) {
+            if (ebEngineerCreate.getCompany() == null || ebEngineerCreate.getCompany().isEmpty()) {
+                JsfUtil.addErrorMessage("企业领主需要填写企业名称");
+                return "400";
+            }
+        }
+        //用户名不能重复
+        List<EbEngineerEntity> list = ebEngineerService.findByProperty("nickName", ebEngineerCreate.getNickName());
+        if (list.size() > 0) {
+            if (list.get(0).getId() != ebEngineerCreate.getId()) {
+                JsfUtil.addErrorMessage("工程师用户名已被使用");
+                return "400";
+            }
+        }
+        //手机号不能重复
+        String encryptMobiletel = EncryptUtil.encrypt(ebEngineerCreate.getMobileTel());
+        if (!ebEngineerCreate.getMobileTel().equals("89FE6AB14D8122DC74B0C969BF447C50")) {
+
+            List<EbEngineerEntity> mobileList = ebEngineerService.findByProperty("mobileTel", encryptMobiletel);
+            if (mobileList.size() > 0) {
+                if (mobileList.get(0).getId() != ebEngineerCreate.getId()) {
+                    JsfUtil.addErrorMessage("工程师手机号已被使用");
+                    return "400";
+                }
+            }
+        }
+        if (t.getWeLevelId() == null) {
+            t.setWeLevelId(1);
+        }
+        t.setOptUserId(optUserId);
+        t.setOptUserName(optUserName);
+        if ((ebEngineer.getWeLevelId() != null && ebEngineer.getWeLevelId() != t.getWeLevelId()) || (ebEngineer.getWeLevelId() == null && t.getWeLevelId() != null)) {
+            Integer levelId = t.getWeLevelId();
+            //systemService.executeSql("delete from eb_engineer_cert where eb_engineer_id = ? and we_brand_cert_id in (70,71,72); ", t.getId());
+            ebEngineerService.deleteEngineerCert(t.getId());
+            EbEngineerCertEntity ebEngineerCertEntity = new EbEngineerCertEntity();
+            ebEngineerCertEntity.setEbEngineerId(t.getId());
+            ebEngineerCertEntity.setOptUserId(optUserId);
+            ebEngineerCertEntity.setOptUserName(optUserName);
+            if (levelId == 2) {
+                ebEngineerCertEntity.setWeBrandCertId(70);
+                ebEngineerService.saveEngineerCert(ebEngineerCertEntity);
+//                systemService.executeSql("insert into eb_engineer_cert(eb_engineer_id,we_brand_cert_id,opt_user_id,opt_user_name) values(?,?,?,?)",
+//                        t.getId(), 70, currentUserId, currentUserName);
+            } else if (levelId == 3) {
+                ebEngineerCertEntity.setWeBrandCertId(71);
+                ebEngineerService.saveEngineerCert(ebEngineerCertEntity);
+//                systemService.executeSql("insert into eb_engineer_cert(eb_engineer_id,we_brand_cert_id,opt_user_id,opt_user_name) values(?,?,?,?)",
+//                        t.getId(), 71, currentUserId, currentUserName);
+            } else if (levelId == 4) {
+                ebEngineerCertEntity.setWeBrandCertId(72);
+                ebEngineerService.saveEngineerCert(ebEngineerCertEntity);
+//                systemService.executeSql("insert into eb_engineer_cert(eb_engineer_id,we_brand_cert_id,opt_user_id,opt_user_name) values(?,?,?,?)",
+//                        t.getId(), 72, currentUserId, currentUserName);
+            }
+
+
+        }
+        if (t.getMyCard() != null && t.getMyCard().equals("")) {
+            t.setMyCard(null);
+        }
+        if (t.getDecryptMoney().isEmpty()) {
+            t.setEncryptMoney("0");
+        }
+        t.setLordVocationId(t.getLordVocationId());
+        t.setBelong(t.getBelong());
+        //设为领主时，判断该工程师是不是其他团队的成员
+        if(t.getEngineerType()!=null&& 4 == t.getEngineerType()){
+            if(ebEngineer.getEngineerType()!=null){
+                if(ebEngineer.getEngineerType()==t.getEngineerType()){//本来就是领主
+                    ebEngineerService.updateEngineerInfo(t);
+                }else{
+                    if(ebEngineer.getIndentifyFlag()!=null&&ebEngineer.getIndentifyFlag()!=2){
+                        JsfUtil.addErrorMessage("该工程师还未通过光大认证");
+                        return "400";
+                    }
+                    if(ebEngineer.getRealNameVerification()!=null&&ebEngineer.getRealNameVerification()!=3){
+                        JsfUtil.addErrorMessage("该工程师还未通过实名认证");
+                        return "400";
+                    }
+                    EbEngineerTeam ebEngineerTeam = ebEngineerService.findEbEngineerById(t.getId());
+                    if (ebEngineerTeam == null) {
+                        String baseUserId = authUserBaseService.findBaseUserIdByLoginName(userPrincipal.getName());
+                        ebEngineerService.update(t);
+
+                        EbEngineerTeam engineerTeamObj = new EbEngineerTeam();
+                        engineerTeamObj.setEbEngineerId(t.getId());
+                        engineerTeamObj.setLongteam(1);
+                        engineerTeamObj.setTeamnum(GenerateNumberingUtil.getTeamNo(ebEngineerService.getTeamNo()));
+                        engineerTeamObj.setOptUserId(baseUserId);
+                        engineerTeamObj.setOptUserName(userPrincipal.getName());
+                        engineerTeamObj.setCreateTime(new Date());
+                        ebEngineerService.saveEbEngineerTeam(engineerTeamObj);
+                        JsfUtil.addSuccessMessage("设置成功");
+                        query();
+                    } else if (ebEngineerTeam.getLongteam() == 1) {
+                        JsfUtil.addErrorMessage("已经是团队长");
+                        return "400";
+                    } else {
+                        JsfUtil.addErrorMessage("已经是团队成员");
+                        return "400";
+                    }
+                }
+            }
+        }else{
+            ebEngineerService.updateEngineerInfo(t);
+        }
+
+        //如果是企业领主，设为团队长
+        if (4 == t.getEngineerType()) {
+            EbEngineerTeam ebEngineerTeam = ebEngineerService.findEngineerInfoById(t.getId());
+            if (ebEngineerTeam == null || ebEngineerTeam.getId() == null) {
+                EbEngineerTeam engineerTeam = new EbEngineerTeam();
+                engineerTeam.setEbEngineerId(t.getId());
+                engineerTeam.setLongteam(1);
+                engineerTeam.setTeamnum(GenerateNumberingUtil.getTeamNo(ebEngineerService.getTeamNo()));
+                engineerTeam.setCreateTime(new Date());
+                engineerTeam.setOptUserId(optUserId);
+                engineerTeam.setOptUserName(optUserName);
+                ebEngineerService.saveEbEngineerTeam(engineerTeam);
+            }
+        }
+        //TODO 论坛,同步信息和日志
+        // discuz论坛,同步信息修改
+//        String email = null;
+//        if (t.getEmail() != null && t.getEmail().matches("^(\\w-*\\.*)+@(\\w-?)+(\\.\\w{2,})+$")) {
+//            email = t.getEmail();
+//        } else {
+//            email = EncryptUtil.decrypt(t.getMobileTel()) + "@cebserv.com";
+//        }
+        Client c = new Client();
+        //c.uc_user_edit(t.getNickName(), "", EncryptUtil.decrypt(t.getPassword()), email, 1, "", "");
+        String message="修改成功";
+        systemService.addLog(message, Globals.Log_Type_UPDATE, Globals.Log_Leavel_INFO);
+        JsfUtil.addSuccessMessage("修改成功");
+        return "200";
+    }
+
+
+    /**
+     * 更新工程师基本信息
+     */
+    @Transactional
+    public String doUpdateTest() {
+        //EbEngineerEntity t = ebEngineerCreate;
+        EbEngineerEntity ebEngineer = ebEngineerService.findById(ebEngineerCreate.getId());
+        String optUserId = authUserBaseService.findBaseUserIdByLoginName(userPrincipal.getName());
+        String optUserName = userPrincipal.getName();
+        if (realName != null && !realName.isEmpty()) {
+            ebEngineerCreate.setRealname(EncryptUtil.encrypt(realName));
+            ebEngineerCreate.setRealnameCode(realName);
+        }
+        ebEngineerCreate.setPassword(EncryptUtil.encrypt(password));
+        if (idCard != null && !idCard.isEmpty()) {
+            ebEngineerCreate.setIdcard(EncryptUtil.encrypt(idCard));
+            ebEngineerCreate.setIdcardCode(idCard);
+        }
+        if (phoneNumber != null && !phoneNumber.isEmpty()) {
+            ebEngineerCreate.setMobileTel(EncryptUtil.encrypt(phoneNumber));
+            ebEngineerCreate.setMobiletelCode(phoneNumber);
+        }
+        if (ebEngineerCreate.getEngineerType()!=null&&4 == ebEngineerCreate.getEngineerType()) {
+            if (ebEngineerCreate.getCompany() == null || ebEngineerCreate.getCompany().isEmpty()) {
+                JsfUtil.addErrorMessage("企业领主需要填写企业名称");
+                return "400";
+            }
+        }
+        //用户名不能重复
+        List<EbEngineerEntity> list = ebEngineerService.findByProperty("nickName", ebEngineerCreate.getNickName());
+        if (list.size() > 0) {
+            if (list.get(0).getId() != ebEngineerCreate.getId()) {
+                JsfUtil.addErrorMessage("工程师用户名已被使用");
+                return "400";
+            }
+        }
+        //手机号不能重复
+        String encryptMobiletel = EncryptUtil.encrypt(ebEngineerCreate.getMobileTel());
+        if (!ebEngineerCreate.getMobileTel().equals("89FE6AB14D8122DC74B0C969BF447C50")) {
+
+            List<EbEngineerEntity> mobileList = ebEngineerService.findByProperty("mobileTel", encryptMobiletel);
+            if (mobileList.size() > 0) {
+                if (mobileList.get(0).getId() != ebEngineerCreate.getId()) {
+                    JsfUtil.addErrorMessage("工程师手机号已被使用");
+                    return "400";
+                }
+            }
+        }
+        if(ebEngineer.getEngineerType()!=null && ebEngineerCreate.getEngineerType()!=null){
+            //领主修改企业名称
+            if(ebEngineer.getEngineerType() == 4 && ebEngineerCreate.getEngineerType() == 4){
+                if(StringUtils.hasLength(ebEngineer.getCompany())){
+                    if(!ebEngineer.getCompany().equals(ebEngineerCreate.getCompany())){
+                        //查询该工程师工单是否有未完成转账工单，存在则不能修改
+                        boolean flag = ebEngineerService.selectUnpaidSch(ebEngineer);
+                        if(flag){
+                            JsfUtil.addErrorMessage("未完成转账，不可修改企业名称");
+                            return "400";
+                        }
+                    }
+                }
+            //领主修改为个人
+            }else if(ebEngineer.getEngineerType() == 4 && ebEngineerCreate.getEngineerType() == 1){
+                //查询该工程师工单是否有未完成转账工单，存在则不能修改
+                boolean flag = ebEngineerService.selectUnpaidSch(ebEngineer);
+                if(flag){
+                    JsfUtil.addErrorMessage("未完成转账，不可修改工程师类型");
+                    return "400";
+                }
+                ebEngineerCreate.setCompany(null);
+            }
+        }
+
+        if (ebEngineerCreate.getWeLevelId() == null) {
+            ebEngineerCreate.setWeLevelId(1);
+        }
+        ebEngineerCreate.setOptUserId(optUserId);
+        ebEngineerCreate.setOptUserName(optUserName);
+
+        if (ebEngineerCreate.getMyCard() != null && ebEngineerCreate.getMyCard().equals("")) {
+            ebEngineerCreate.setMyCard(null);
+        }
+        if (ebEngineerCreate.getDecryptMoney().isEmpty()) {
+            ebEngineerCreate.setEncryptMoney("0");
+        }
+        //设为领主时，判断该工程师是不是其他团队的成员
+        if(ebEngineerCreate.getEngineerType()!=null) {
+            if ( 4 == ebEngineerCreate.getEngineerType()) {
+                if (ebEngineer.getEngineerType() != null) {
+                    if (ebEngineer.getEngineerType() == ebEngineerCreate.getEngineerType()) {//本来就是领主
+                        ebEngineerService.updateEngineerInfo(ebEngineerCreate);
+                    } else {
+                        if (ebEngineer.getIndentifyFlag() != null && ebEngineer.getIndentifyFlag() != 2) {
+                            JsfUtil.addErrorMessage("该工程师还未通过光大认证");
+                            return "400";
+                        }
+                        if (ebEngineer.getRealNameVerification() != null && ebEngineer.getRealNameVerification() != 3) {
+                            JsfUtil.addErrorMessage("该工程师还未通过实名认证");
+                            return "400";
+                        }
+                        EbEngineerTeam ebEngineerTeam = ebEngineerService.findEbEngineerById(ebEngineerCreate.getId());
+                        if (ebEngineerTeam == null) {
+                            String baseUserId = authUserBaseService.findBaseUserIdByLoginName(userPrincipal.getName());
+                            ebEngineerService.updateEngineerInfo(ebEngineerCreate);
+
+                            EbEngineerTeam engineerTeamObj = new EbEngineerTeam();
+                            engineerTeamObj.setEbEngineerId(ebEngineerCreate.getId());
+                            engineerTeamObj.setLongteam(1);
+                            engineerTeamObj.setTeamnum(GenerateNumberingUtil.getTeamNo(ebEngineerService.getTeamNo()));
+                            engineerTeamObj.setOptUserId(baseUserId);
+                            engineerTeamObj.setOptUserName(userPrincipal.getName());
+                            engineerTeamObj.setCreateTime(new Date());
+                            ebEngineerService.saveEbEngineerTeam(engineerTeamObj);
+                            JsfUtil.addSuccessMessage("设置成功");
+                            query();
+                        } else if (ebEngineerTeam.getLongteam() == 1) {
+                            JsfUtil.addErrorMessage("已经是团队长");
+                            return "400";
+                        } else {
+                            JsfUtil.addErrorMessage("已经是团队成员");
+                            return "400";
+                        }
+                    }
+                }
+            } else if (1 == ebEngineerCreate.getEngineerType()) {
+                //由领主设置为个人：1、领主团队无其他成员2、设为个人时删除团队信息
+                if(ebEngineer.getEngineerType()!=null&&ebEngineer.getEngineerType()==4){
+                    EbEngineerTeam ebEngineerTeam = ebEngineerService.findEbEngineerById(ebEngineerCreate.getId());
+                    if(ebEngineerTeam!=null){
+                        Integer teamNum = ebEngineerService.findEngineerTeamNum(ebEngineerTeam.getTeamnum());
+                        if(teamNum!=null){
+                            JsfUtil.addErrorMessage("该领主团队中还有成员，不能设置为个人工程师");
+                            return "400";
+                        }
+                        ebEngineerService.removeEngineerTeamInfo(ebEngineerTeam);
+                    }
+                }
+                ebEngineerService.updateEngineerInfo(ebEngineerCreate);
+            }else{
+                ebEngineerService.updateEngineerInfo(ebEngineerCreate);
+            }
+            //实名认证、光大认证之后，同步数据到boss3（设为领主，nboss编辑）
+            ebEngineerService.syncToBoss3(ebEngineerCreate,userPrincipal);
+        }
+        if ((ebEngineer.getWeLevelId() != null && ebEngineer.getWeLevelId() != ebEngineerCreate.getWeLevelId()) || (ebEngineer.getWeLevelId() == null && ebEngineerCreate.getWeLevelId() != null)) {
+            Integer levelId = ebEngineerCreate.getWeLevelId();
+            ebEngineerService.deleteEngineerCert(ebEngineerCreate.getId());
+            EbEngineerCertEntity ebEngineerCertEntity = new EbEngineerCertEntity();
+            ebEngineerCertEntity.setEbEngineerId(ebEngineerCreate.getId());
+            ebEngineerCertEntity.setOptUserId(optUserId);
+            ebEngineerCertEntity.setOptUserName(optUserName);
+            if (levelId == 2) {
+                ebEngineerCertEntity.setWeBrandCertId(70);
+                ebEngineerService.saveEngineerCert(ebEngineerCertEntity);
+            } else if (levelId == 3) {
+                ebEngineerCertEntity.setWeBrandCertId(71);
+                ebEngineerService.saveEngineerCert(ebEngineerCertEntity);
+            } else if (levelId == 4) {
+                ebEngineerCertEntity.setWeBrandCertId(72);
+                ebEngineerService.saveEngineerCert(ebEngineerCertEntity);
+            }
+        }
+        String message="修改成功";
+        systemService.addLog(message, Globals.Log_Type_UPDATE, Globals.Log_Leavel_INFO);
+        JsfUtil.addSuccessMessage("修改成功");
+        return "200";
+    }
+
+
+
+
+
+
+
+
+    /**
+     * 添加工程师基本信息
+     *
+     * @param
+     * @param
+     * @return
+     */
+    @Transactional
+    public String doAdd() {
+        if (ebEngineerCreate.getNickName() == null || ebEngineerCreate.getNickName().isEmpty()) {
+            JsfUtil.addErrorMessage("请填写用户名");
+            return "400";
+        }
+
+        if (password == null || password.isEmpty()) {
+            JsfUtil.addErrorMessage("请填写登录密码");
+            return "400";
+        }
+        ebEngineerCreate.setPassword(EncryptUtil.encrypt(password));
+        ebEngineerCreate.setPasswordCode(password);
+        if (realName == null || realName.isEmpty()) {
+//            JsfUtil.addErrorMessage("请填写真实姓名");
+//            return "400";
+        }else{
+            ebEngineerCreate.setRealname(EncryptUtil.encrypt(realName));
+            ebEngineerCreate.setRealnameCode(realName);
+        }
+
+        if (phoneNumber == null || phoneNumber.isEmpty()) {
+            JsfUtil.addErrorMessage("请填写手机号");
+            return "400";
+        }
+        if(!this.isPhone(phoneNumber)){
+            JsfUtil.addErrorMessage("手机号码不符合规范");
+            return "400";
+        }
+        ebEngineerCreate.setMobileTel(EncryptUtil.encrypt(phoneNumber));
+        ebEngineerCreate.setMobiletelCode(phoneNumber);
+
+//        if (ebEngineerCreate.getWorkingTimeId() == null) {
+//            JsfUtil.addErrorMessage("请选择工作年限");
+//            return "400";
+//        }
+        if (ebEngineerCreate.getEngineerType()!=null&&4 == ebEngineerCreate.getEngineerType()) {
+            if (ebEngineerCreate.getCompany() == null || ebEngineerCreate.getCompany().isEmpty()) {
+                JsfUtil.addErrorMessage("企业领主需要填写企业名称");
+                return "400";
+            }
+        }
+        if (idCard != null && !idCard.isEmpty()) {
+            ebEngineerCreate.setIdcard(EncryptUtil.encrypt(idCard));
+            ebEngineerCreate.setIdcardCode(idCard);
+        }
+        //用户名不能重复
+        List<EbEngineerEntity> list = ebEngineerService.findByProperty("nickName", ebEngineerCreate.getNickName());
+        if (list.size() > 0) {
+            JsfUtil.addErrorMessage("工程师用户名已被使用");
+            return "400";
+        }
+        //手机号不能重复
+        String encryptMobiletel = EncryptUtil.encrypt(ebEngineerCreate.getDecryptMobiletel());
+        if (!ebEngineerCreate.getMobileTel().equals("89FE6AB14D8122DC74B0C969BF447C50")) {
+
+            List<EbEngineerEntity> mobileList = ebEngineerService.findByProperty("mobileTel", encryptMobiletel);
+            if (mobileList.size() > 0) {
+                JsfUtil.addErrorMessage("工程师手机号已被使用");
+                return "400";
+            }
+        }
+        if (ebEngineerCreate.getMyCard() != null && ebEngineerCreate.getMyCard().equals("")) {
+            ebEngineerCreate.setMyCard(null);
+        }
+        String baseUserId = authUserBaseService.findBaseUserIdByLoginName(userPrincipal.getName());
+        //添加注册源
+        ebEngineerCreate.setRegisterSource(4);
+        //添加隶属
+        ebEngineerCreate.setBelong(ebEngineer.getBelong());
+        ebEngineerCreate.setOptUserId(baseUserId);
+        ebEngineerCreate.setOptUserName(userPrincipal.getName());
+        ebEngineerCreate.setEncryptMoney("0");
+        ebEngineerCreate.setSchAcceptable(0);
+        ebEngineerCreate.setOnlineFlag(-1);
+        ebEngineerCreate.setMypoints(12);
+        ebEngineerCreate.setIndentifyFlag(0);
+        ebEngineerCreate.setRealNameVerification(1);
+        if (ebEngineerCreate.getWeLevelId() == null) {
+            ebEngineerCreate.setWeLevelId(1);
+        }
+
+        ebEngineerCreate.setCreateTime(new Date());
+        ebEngineerCreate.setUpdateTime(new Date());
+        ebEngineerService.create(ebEngineerCreate);
+        //如果是企业领主，设为团队长
+        if (4 == ebEngineerCreate.getEngineerType()) {
+            EbEngineerTeam engineerTeam = new EbEngineerTeam();
+            engineerTeam.setEbEngineerId(ebEngineerCreate.getId());
+            engineerTeam.setLongteam(1);
+            engineerTeam.setTeamnum(GenerateNumberingUtil.getTeamNo(ebEngineerService.getTeamNo()));
+            engineerTeam.setCreateTime(new Date());
+            engineerTeam.setOptUserId(baseUserId);
+            engineerTeam.setOptUserName(userPrincipal.getName());
+            ebEngineerService.saveEbEngineerTeam(engineerTeam);
+        }
+        Integer levelId = ebEngineerCreate.getWeLevelId();
+        if (levelId == 2 || levelId == 3 || levelId == 4) {
+            List<EbEngineerEntity> tem = ebEngineerService.findByProperty("nickName", ebEngineerCreate.getNickName());
+            EbEngineerCertEntity temp = new EbEngineerCertEntity();
+            temp.setEbEngineerId(tem.get(0).getId());
+            if (levelId == 2) {
+                temp.setWeBrandCertId(70);
+            } else if (levelId == 3) {
+                temp.setWeBrandCertId(71);
+            } else if (levelId == 4) {
+                temp.setWeBrandCertId(72);
+            }
+            temp.setOptUserId(baseUserId);
+            temp.setOptUserName(userPrincipal.getName());
+            ebEngineerService.saveEbEngineerCert(temp);
+        }
+        //同步到环信
+        if (EasemobUtil.HttpAddUsers(ebEngineerCreate.getId().toString()) == 200) {
+            System.out.println("环信同步成功");
+        }
+        // discuz论坛同步注册
+        Client c = new Client();
+        // TODO 论坛同步注册
+        //c.uc_user_register(ebEngineerCreate.getNickName(), EncryptUtil.decrypt(ebEngineerCreate.getPassword()), ebEngineerCreate.getMobileTel() + "cebserv@qq.com");
+        // TODO 日志
+        String message="工程师基本信息添加成功";
+        systemService.addLog(message, Globals.Log_Type_INSERT,Globals.Log_Leavel_INFO);
+        JsfUtil.addSuccessMessage("工程师基本信息添加成功");
+        return "200";
+    }
+
+    public  boolean isPhone( String str ) {
+        if( str != null && str.length() > 0 ){
+//            String regExp = "^1(3|4|5|7|8)\\d{9}$";
+            String regExp = "^1(3|4|5|6|7|8|9)\\d{9}$";
+            Pattern p = Pattern.compile(regExp);
+            Matcher m = p.matcher(str);
+            return m.matches();
+        }
+        return false;
+    }
+
+//工作年限转换
+    public String switchWorkingTime(Integer workTimeId){
+        if(workTimeId!=null){
+            if(workTimeId==1){
+                return "小于一年";
+            }else if(workTimeId==2){
+                return "一到三年";
+            }else if(workTimeId==3){
+                return "三到五年";
+            }else if(workTimeId==4){
+                return "五年以上";
+            }else if(workTimeId==5){
+                return "十年以上";
+            }
+        }
+        return null;
+    }
+    //设为领主初始化dialog
+    public void initDialog(){
+        leaderCompany=null;
+    }
+    //设为领主
+    @Transactional
+    public String setTeamLeader() {
+        if (selectEbEngineerList != null) {
+            if(leaderCompany==null||leaderCompany.isEmpty()){
+                JsfUtil.addErrorMessage("企业领主需要填写企业名称");
+                return "400";
+            }
+            List<EbEngineerEntity> engineer = ebEngineerService.selectEngineerByCompany(leaderCompany,selectEbEngineerList.getId());
+            if(engineer!=null && engineer.size()>0){
+                JsfUtil.addErrorMessage("该公司已被绑定");
+                return "400";
+            }
+//            Integer[] ids = new Integer[selectEbEngineerList.size()];
+//            for (Integer i = 0; i<selectEbEngineerList.size(); i++) {
+//                ids[i] = selectEbEngineerList.get(i).getId();
+//            }
+            //for(EbEngineerEntity item : selectEbEngineerList){
+                if(selectEbEngineerList.getIndentifyFlag()!=null&&selectEbEngineerList.getIndentifyFlag()!=2){
+                    JsfUtil.addErrorMessage("该工程师还未通过光大认证");
+                    return "400";
+                }
+                if(selectEbEngineerList.getRealNameVerification()!=null&&selectEbEngineerList.getRealNameVerification()!=3){
+                    JsfUtil.addErrorMessage("该工程师还未通过实名认证");
+                    return "400";
+                }
+            //}
+            //for (EbEngineerEntity item : selectEbEngineerList) {
+            EbEngineerEntity item = new EbEngineerEntity();
+            item= selectEbEngineerList;
+                EbEngineerEntity ebEngineerEntity = ebEngineerService.findById(item.getId());
+                EbEngineerTeam ebEngineerTeam = ebEngineerService.findEbEngineerById(item.getId());
+                if (ebEngineerTeam == null) {
+                    String baseUserId = authUserBaseService.findBaseUserIdByLoginName(userPrincipal.getName());
+                    ebEngineerEntity.setEngineerType(4);
+                    ebEngineerEntity.setCompany(leaderCompany);
+                    ebEngineerService.update(ebEngineerEntity);
+
+                    EbEngineerTeam engineerTeamObj = new EbEngineerTeam();
+                    engineerTeamObj.setEbEngineerId(item.getId());
+                    engineerTeamObj.setLongteam(1);
+                    engineerTeamObj.setTeamnum(GenerateNumberingUtil.getTeamNo(ebEngineerService.getTeamNo()));
+                    engineerTeamObj.setOptUserId(baseUserId);
+                    engineerTeamObj.setOptUserName(userPrincipal.getName());
+                    engineerTeamObj.setCreateTime(new Date());
+                    ebEngineerService.saveEbEngineerTeam(engineerTeamObj);
+                    //实名认证、光大认证之后，同步数据到boss3（设为领主，nboss编辑）
+                    ebEngineerService.syncToBoss3(ebEngineerEntity,userPrincipal);
+                    JsfUtil.addSuccessMessage("设置成功");
+                    PrimeFaces.current().executeScript("PF('leaderDialog').hide()");
+                    query();
+                } else if (ebEngineerTeam.getLongteam() == 1) {
+                    JsfUtil.addErrorMessage("已经是团队长");
+                    return "400";
+                } else {
+                    JsfUtil.addErrorMessage("已经是团队成员");
+                    return "400";
+                }
+
+            //}
+        } else {
+            JsfUtil.addErrorMessage("请选择一条数据后操作");
+            return "400";
+        }
+        return "200";
+    }
+
+    //查看团员
+    public String showEngineerTeamList() {
+        if (selectEbEngineerList!=null) {
+            if (selectEbEngineerList.getEngineerType() == 2 || selectEbEngineerList.getEngineerType() == 4) {
+                if (selectEbEngineerList.getLongteam() == null || selectEbEngineerList.getLongteam() == 0) {
+                    JsfUtil.addErrorMessage("选择的工程师不是团队长");
+                    return "400";
+                } else {
+                    return "/engineer/engineer_team_list.xhtml?faces-redirect=true&engineerId=" + selectEbEngineerList.getId();
+                }
+            } else {
+                JsfUtil.addErrorMessage("该工程师不是领主");
+                return "400";
+            }
+        } else {
+            JsfUtil.addErrorMessage("请选择一条数据后操作");
+            return "400";
+        }
+    }
+
+
+    //跳转添加页面
+    public String switchToAddEngineer() {
+        ebEngineerCreate = new EbEngineerEntity();
+        password = null;
+        realName = null;
+        phoneNumber = null;
+        money = null;
+        idCard = null;
+        return "/engineer/engineer_info_create.xhtml?faces-redirect=true";
+    }
+
+    //跳转编辑页面
+    public String switchToEditEngineer() {
+        if (selectEbEngineerList!=null) {
+            return "/engineer/engineer_info.xhtml?faces-redirect=true&engineerId=" + selectEbEngineerList.getId() + "&flag=" + 1;
+        } else {
+            JsfUtil.addErrorMessage("请选择一条数据后操作");
+            return "400";
+        }
+    }
+
+    //返回列表
+    public String returnToMain() {
+        Integer type = Integer.valueOf(flag);
+        if (type == 1||type == 0) {
+            return "/engineer/engineer_list.xhtml?faces-redirect=true";
+        } else if (type == 2) {
+            return "/engineer/engineer_team_list.xhtml?faces-redirect=true&engineerId=" + id;
+        }
+        return null;
+    }
+    //返回列表
+    public String returnToMains() {
+        return "/engineer/engineer_list.xhtml?faces-redirect=true";
+    }
+
+    //查看资料
+    public String switchToEngineersInfo() {
+        if (selectEbEngineerList!=null) {
+            return "/qoorder/engineer/eb_engineer_info.xhtml?faces-redirect=true&engineerId=" + selectEbEngineerList.getId() + "&flag=" + 4;
+        } else {
+            JsfUtil.addErrorMessage("请选择一条数据后操作");
+            return "400";
+        }
+    }
+
+    //添加工程师擅长领域
+    public String addEngineerDomain() {
+        if (selectEbEngineerList!=null) {
+            return "/engineer/domain/eb_domain_add.xhtml?faces-redirect=true&engineerId=" + selectEbEngineerList.getId()+"&rollBackUrl=/engineer/engineer_list.xhtml" ;
+        } else {
+            JsfUtil.addErrorMessage("请选择一条数据后操作");
+            return "400";
+        }
+    }
+
+
+
+    //跳转教育背景页面
+    public String showEduBackground() {
+        if (selectEbEngineerList!=null) {
+            ebEduBackgroundEntity = ebEngineerService.findEudBackgroundByEngineerId(selectEbEngineerList.getId());
+            if (ebEduBackgroundEntity != null) {
+                return "/engineer/engineer_edu_background.xhtml?faces-redirect=true&engineerId=" + selectEbEngineerList.getId() + "&flag=" + 1;
+            } else {
+                JsfUtil.addErrorMessage("该工程师没有添加教育背景");
+                return "400";
+            }
+
+        } else {
+            JsfUtil.addErrorMessage("请选择一条数据后操作");
+            return "400";
+        }
+    }
+
+    //审核证书
+    public String checkCertificate() {
+        if (selectEbEngineerList!=null) {
+            return "/engineer/eb_engineer_cert.xhtml?faces-redirect=true&engineerId=" + selectEbEngineerList.getId();
+        } else {
+            JsfUtil.addErrorMessage("请选择一条数据后操作");
+            return "400";
+        }
+    }
+    //工程师交易流水
+    public String switchToWasteBook(){
+        if (selectEbEngineerList!=null) {
+            return "/engineer/ep_waste_book_list.xhtml?faces-redirect=true&id=" + selectEbEngineerList.getId();
+        } else {
+            JsfUtil.addErrorMessage("请选择一条数据后操作");
+            return "400";
+        }
+    }
+    /**
+     * 工程师不可接单
+     */
+    public String setSchAcceptableNot(Integer optType) {
+        String reason = acceptableNotReason;
+        if (reason == null || reason.isEmpty()) {
+            JsfUtil.addErrorMessage("请填写不可接单原因");
+            return "400";
+        }
+        if (selectEbEngineerList != null) {
+            String currentUserId = authUserBaseService.findBaseUserIdByLoginName(userPrincipal.getName());//当前登录用户ID
+            String currentUserName = userPrincipal.getName();//当前登录用户名
+            EbEngineerEntity ebEngineer = ebEngineerService.findById(selectEbEngineerList.getId());
+            List<EbScoreContentEntity> list = ebEngineerService.findAllEbScoreContent();
+            for (EbScoreContentEntity item : list) {
+                Integer engineerSpectrumId = ebEngineerService.findEngineerSpectrum(item.getScoreContent(), selectEbEngineerList.getId());
+                if (engineerSpectrumId == null) {
+                    EbEngineerSpectrumEntity ese = new EbEngineerSpectrumEntity();
+                    ese.setEbEngineerId(ebEngineer.getId());
+                    ese.setEbScoreContentId(item.getScoreContent());
+                    ese.setScore(0);
+                    ese.setOptUserId(currentUserId);
+                    ese.setCreateTime(new Date());
+                    ese.setOptUserName(currentUserName);
+                    ebEngineerService.saveEngineerSpectrum(ese);
+                } else {
+                    if (ebEngineer.getSchAcceptable() == null || ebEngineer.getSchAcceptable() != 0) {
+                        EbEngineerSpectrumEntity eese = ebEngineerService.findEngineerSpectrumById(engineerSpectrumId);
+                        Integer score = eese.getScore() - 60;
+                        eese.setScore(score > 0 ? score : 0);
+                        eese.setOptUserId(currentUserId);
+                        eese.setOptUserName(currentUserName);
+                        ebEngineerService.updateEngineerSpectrum(eese);
+                    }
+                }
+
+            }
+            BigDecimal averageScore = ebEngineerService.countSpectrumValue(ebEngineer.getId());
+            ebEngineer.setSpectrumValue(averageScore.doubleValue());
+            if (ebEngineer.getWeColourAtlaId() == null || 5 != ebEngineer.getWeColourAtlaId()) {
+                WeColourEngineerLogEntity wcele = new WeColourEngineerLogEntity();
+                wcele.setEbEngineerId(ebEngineer.getId());
+                wcele.setWeColourAtlaIdOld(ebEngineer.getWeColourAtlaId());
+                wcele.setWeColourAtlaIdNew(5);
+                wcele.setOptMemo("工程师不可接单，更新工程师色卡");
+                wcele.setOptUserId(currentUserId);
+                wcele.setOptUserName(currentUserName);
+                wcele.setCreateTime(new Date());
+                ebEngineerService.saveWeColourEngineerLog(wcele);//保存工程师色卡更改记录
+                ebEngineer.setWeColourAtlaId(5);
+            }
+            ebEngineer.setSchAcceptable(optType);
+            ebEngineer.setBlackFlag(optType);
+            ebEngineer.setSchAcceptableReason(reason);
+            ebEngineer.setOptUserId(currentUserId);
+            ebEngineer.setOptUserName(currentUserName);
+            ebEngineerService.update(ebEngineer);
+            query();
+            JsfUtil.addSuccessMessage("工程师接单权限更新成功");
+            return "200";
+        } else {
+            JsfUtil.addErrorMessage("请选择一条数据后操作");
+            return "400";
+        }
+
+    }
+
+    //工程师可接单
+    public String setSchAcceptable(Integer optType) {
+        if (selectEbEngineerList != null) {
+            String currentUserId = authUserBaseService.findBaseUserIdByLoginName(userPrincipal.getName());//当前登录用户ID
+            String currentUserName = userPrincipal.getName();//当前登录用户名
+            //for (EbEngineerEntity items : selectEbEngineerList) {
+            EbEngineerEntity items =new EbEngineerEntity();
+            items=selectEbEngineerList;
+                EbEngineerEntity ebEngineer = ebEngineerService.findById(items.getId());
+                List<EbScoreContentEntity> list = ebEngineerService.findAllEbScoreContent();
+                for (EbScoreContentEntity item : list) {
+                    Integer engineerSpectrumId = ebEngineerService.findEngineerSpectrum(item.getScoreContent(), items.getId());
+                    if (engineerSpectrumId == null) {
+                        EbEngineerSpectrumEntity ese = new EbEngineerSpectrumEntity();
+                        ese.setEbEngineerId(ebEngineer.getId());
+                        ese.setEbScoreContentId(item.getScoreContent());
+                        ese.setScore(60);
+                        ese.setOptUserId(currentUserId);
+                        ese.setOptUserName(currentUserName);
+                        ese.setCreateTime(new Date());
+                        ebEngineerService.saveEngineerSpectrum(ese);
+                    } else {
+                        if (ebEngineer.getSchAcceptable() == null || ebEngineer.getSchAcceptable() != 1) {
+                            EbEngineerSpectrumEntity eese = ebEngineerService.findEngineerSpectrumById(engineerSpectrumId);
+                            Integer score = eese.getScore() + 60;
+                            eese.setScore(score > 100 ? 100 : score);
+                            eese.setOptUserId(currentUserId);
+                            eese.setOptUserName(currentUserName);
+                            ebEngineerService.updateEngineerSpectrum(eese);
+                        }
+                    }
+                    BigDecimal averageScore = ebEngineerService.countSpectrumValue(ebEngineer.getId());
+                    Integer count = ebEngineerService.countEbEngineerId(ebEngineer.getId());
+                    if (averageScore != null) {
+                        ebEngineer.setSpectrumValue(averageScore.doubleValue());
+                        Integer wecaid = -1;
+                        if (count != null)
+                            if (count > 2) {
+                                wecaid = 5;
+                            } else if (count > 1) {
+                                wecaid = 4;
+                            } else if (count == 1) {
+                                wecaid = 3;
+                            } else if (averageScore.doubleValue() >= 60 && averageScore.doubleValue() < 85) {
+                                wecaid = 6;
+                            } else if (averageScore.doubleValue() >= 85) {
+                                wecaid = 7;
+                            }
+                        if (wecaid > 0 && wecaid != ebEngineer.getWeColourAtlaId()) {
+                            WeColourEngineerLogEntity wcele = new WeColourEngineerLogEntity();
+                            wcele.setEbEngineerId(ebEngineer.getId());
+                            wcele.setWeColourAtlaIdOld(ebEngineer.getWeColourAtlaId());
+                            wcele.setWeColourAtlaIdNew(wecaid);
+                            wcele.setOptMemo("工程师可接单，更新工程师色卡");
+                            wcele.setOptUserId(currentUserId);
+                            wcele.setOptUserName(currentUserName);
+                            wcele.setCreateTime(new Date());
+                            ebEngineerService.saveWeColourEngineerLog(wcele);//保存工程师色卡更改记录
+                            ebEngineer.setWeColourAtlaId(wecaid);
+                        }
+                    } else {
+                        ebEngineer.setSpectrumValue(null);
+                    }
+                    ebEngineer.setSchAcceptable(optType);
+                    ebEngineer.setBlackFlag(optType);
+                    ebEngineer.setOptUserId(currentUserId);
+                    ebEngineer.setOptUserName(currentUserName);
+                    ebEngineerService.update(ebEngineer);
+                }
+            //}
+            query();
+            JsfUtil.addSuccessMessage("工程师接单权限更新成功");
+            return "200";
+
+        } else {
+            JsfUtil.addErrorMessage("请选择数据后操作");
+            return "400";
+        }
+    }
+
+    //展示身份证照片
+    public String showIdCardPic(){
+        if(selectEbEngineerList!=null){
+            showEbEngineer=selectEbEngineerList;
+            if(showEbEngineer.getCertificationType()==null||showEbEngineer.getCertificationType()==3){
+                String url=QiniuUtil.getPictureDownloadUrl(selectEbEngineerList.getIdCardPicture());
+                if(url!=null){
+                    showEbEngineer.setIdCardPictureUrl(url);
+                }
+            }else if(showEbEngineer.getCertificationType()==2){
+                showEbEngineer.setIdCardPictureUrl(selectEbEngineerList.getIdCardPicture());
+            }
+            if(showEbEngineer.getRealNameVerification()==3){
+                realNameVerification=1;
+            }else if(showEbEngineer.getRealNameVerification()==0){
+                realNameVerification=0;
+            }else if(showEbEngineer.getRealNameVerification()==2){
+                realNameVerification=-1;
+            }
+            return "200";
+        }else{
+            JsfUtil.addErrorMessage("请选择一条数据后操作");
+            return "400";
+        }
+    }
+    //设置是否显示
+    public void setEnableShows(){
+        if(realNameVerification==-1){
+            enableShow=false;
+        }else{
+            enableShow=true;
+        }
+    }
+    //审核
+    @Transactional
+    public String verifyEbEngineerInfo(){
+        String optUserId=authUserBaseService.findBaseUserIdByLoginName(userPrincipal.getName());
+        String optUserName =userPrincipal.getName();
+        Date optDate = new Date();
+        EbEngineerEntity entity = ebEngineerService.findById(selectEbEngineerList.getId());
+        if(realNameVerification==-1){
+            if(notPassReason==null&&notPassReason.isEmpty()){
+                JsfUtil.addErrorMessage("请填写审核失败的原因");
+                return "400";
+            }
+            entity.setPic1Flag(status);
+            entity.setPic2Flag(status);
+            entity.setRealNameVerification(2);
+            entity.setAuditRemake(notPassReason);
+            entity.setOptUserId(optUserId);
+            entity.setOptUserName(optUserName);
+            entity.setCertificationType(3);
+            entity.setUpdateTime(new Date());
+            ebEngineerService.save(entity);
+            CertificateAuditEntity auditEntity = new CertificateAuditEntity();
+            auditEntity.setCfName("idCard");
+            auditEntity.setUserId(entity.getId().toString());
+            auditEntity.setReason(notPassReason);
+            auditEntity.setUserType("ENGINEER");
+            auditEntity.setHandleTime(optDate);
+            auditEntity.setAuditStatus("-1");
+            auditEntity.setCfPhoto(entity.getIdCardPicture());
+            ebEngineerService.createCertificateAudit(auditEntity);
+            XgPushEntity xgPush = xgPushService.getXgPushByUserId(entity.getId().toString(),"ENGINEER");
+            if(BaseUtil.isNotEmpty(xgPush)){
+                String message = "很抱歉，您的实名认证审核失败，请查看原因并重新进行认证。";
+                HashMap<String, Object> params = new HashMap<>();
+                params.put("_pushType","3");
+                params.put("_pushMessage","身份认证不通过");
+                params.put("identity_flag","2");
+                JSONObject json = new JSONObject(params);
+                xingePushUtil.sendXgPush(message, xgPush, json.toString());
+            }
+
+            JsfUtil.addSuccessMessage("审核不通过");
+
+        }else if(realNameVerification==1){
+            entity.setPic1Flag(status);
+            entity.setPic2Flag(status);
+            entity.setRealNameVerification(3);
+            entity.setOptUserId(optUserId);
+            entity.setOptUserName(optUserName);
+            entity.setCertificationType(3);
+            entity.setUpdateTime(new Date());
+            ebEngineerService.save(entity);
+            CertificateAuditEntity auditEntity = new CertificateAuditEntity();
+            auditEntity.setCfName("idCard");
+            auditEntity.setUserId(entity.getId().toString());
+            auditEntity.setReason(notPassReason);
+            auditEntity.setUserType("ENGINEER");
+            auditEntity.setHandleTime(optDate);
+            auditEntity.setAuditStatus("1");
+            auditEntity.setCfPhoto(entity.getIdCardPicture());
+            ebEngineerService.createCertificateAudit(auditEntity);
+            if(!StringUtils.isEmpty(entity.getRealname()) && !StringUtils.isEmpty(entity.getEbWorkingTimeStr())
+                    && !StringUtils.isEmpty(entity.getIntroduction())
+                    && !StringUtils.isEmpty(entity.getPetName())
+                    && !StringUtils.isEmpty(entity.getHeadPortrait()) && !StringUtils.isEmpty(entity.getSex())){
+                XgPushEntity xgPush = xgPushService.getXgPushByUserId(entity.getId().toString(),"ENGINEER");
+                if(BaseUtil.isNotEmpty(xgPush)){
+                    String message = "亲，恭喜你通过了实名认证，你现在可以开始接单了！";
+                    HashMap<String, Object> params = new HashMap<>();
+                    params.put("_pushType","1");
+                    params.put("_pushMessage","身份认证通过");
+                    params.put("identity_flag","3");
+                    JSONObject json = new JSONObject(params);
+                    xingePushUtil.sendXgPush(message, xgPush, json.toString());
+                    if(businessConfigSum.isSend_msg()){
+                        sendMsg(entity,"","412568");
+                    }else{
+                        log.info("【神行工程师】恭喜你通过了实名认证，你现在可以开始接单了！请进入神行工程师查看详情");
+                    }
+                }
+
+            }
+            //实名认证、光大认证之后，同步数据到boss3
+            ebEngineerService.syncToBoss3(entity,userPrincipal);
+            JsfUtil.addSuccessMessage("审核已通过");
+        }
+        return "200";
+    }
+
+    public void sendMsg(EbEngineerEntity ebEngineerEntity, String paras, String templateId){
+        String phonenumber = EncryptUtil.decrypt(ebEngineerEntity.getMobileTel());
+        System.out.println("phonenumber:"+phonenumber+",paras:"+paras+",templateId:"+templateId);
+        if( businessConfigSum.isSend_msg()) {
+            smsVerificationService.asyncSendDynamicSMS(phonenumber, paras, templateId);
+        }
+    }
+    //光大认证（更新工程师认证状态）
+    @Transactional
+    public String setIndentifyFlag(Integer indentifyFlag){
+        if(selectEbEngineerList!=null) {
+            String content = "";
+            String currentUserId = authUserBaseService.findBaseUserIdByLoginName(userPrincipal.getName());
+            String currentUserName = userPrincipal.getName();
+            EbEngineerEntity ebEngineer =ebEngineerService.findById(selectEbEngineerList.getId());
+            if (indentifyFlag == -1) {
+                ebEngineer.setIndentifyFlag(indentifyFlag);
+                ebEngineer.setOnlineFlag(-2);
+                ebEngineer.setSchAcceptable(0);
+                content = "您的个人资料未通过平台审核，请检查相关资料后重新提交审核。";
+                //信鸽推送
+                XgPushEntity xgPush = xgPushService.getXgPushByUserId(ebEngineer.getId().toString(),"ENGINEER");
+                if(StringUtil.isNotEmpty(xgPush)){
+                    String message = content;
+                    Map<String,Object> param = new HashMap<String,Object>();
+                    JSONObject json = new JSONObject(param);
+                    xingePushUtil.sendXgPush(message, xgPush, json.toString());
+                }
+            }else if (indentifyFlag == 2 ) {
+                content = "通知您已经通过认证，可以接单了。快快打开APP进入工单市场去抢单吧~";
+                List<Integer> list=ebEngineerService.findByScoreContent();
+                for(Integer item:list){
+                    Integer engineerSpectrumId=ebEngineerService.findEngineerSpectrum(item,ebEngineer.getId());
+                    if(engineerSpectrumId==null){
+                        EbEngineerSpectrumEntity ese = new EbEngineerSpectrumEntity() ;
+                        ese.setEbEngineerId(ebEngineer.getId());
+                        ese.setEbScoreContentId(item);
+                        ese.setScore(60);
+                        ese.setOptUserId(currentUserId);
+                        ese.setOptUserName(currentUserName);
+                        ese.setCreateTime(new Date());
+                        ebEngineerService.saveEngineerSpectrum(ese);
+                    }else{
+                        if (ebEngineer.getSchAcceptable() == null || ebEngineer.getSchAcceptable()!= 1){
+                            EbEngineerSpectrumEntity eese = ebEngineerService.findEngineerSpectrumById(engineerSpectrumId);
+                            Integer score = eese.getScore()+60;
+                            eese.setScore(score > 100 ? 100 : score);
+                            eese.setOptUserId(currentUserId);
+                            eese.setOptUserName(currentUserName);
+                            ebEngineerService.updateEngineerSpectrum(eese);
+                        }
+                    }
+                }
+                BigDecimal averageScore = ebEngineerService.countSpectrumValue(ebEngineer.getId());
+                Integer count = ebEngineerService.countEbEngineerId(ebEngineer.getId());
+                if (averageScore != null) {
+                    ebEngineer.setSpectrumValue(averageScore.doubleValue());
+                    Integer wecaid = -1;
+                    if (count != null)
+                        if (count > 2) {
+                            wecaid = 5;
+                        } else if (count > 1) {
+                            wecaid = 4;
+                        } else if (count == 1) {
+                            wecaid = 3;
+                        } else if (averageScore.doubleValue() >= 60 && averageScore.doubleValue() < 85) {
+                            wecaid = 6;
+                        } else if (averageScore.doubleValue() >= 85) {
+                            wecaid = 7;
+                        }
+                    if (wecaid > 0 && wecaid != ebEngineer.getWeColourAtlaId()) {
+                        WeColourEngineerLogEntity wcele = new WeColourEngineerLogEntity();
+                        wcele.setEbEngineerId(ebEngineer.getId());
+                        wcele.setWeColourAtlaIdOld(ebEngineer.getWeColourAtlaId());
+                        wcele.setWeColourAtlaIdNew(wecaid);
+                        wcele.setOptMemo("工程师可接单，更新工程师色卡");
+                        wcele.setOptUserId(currentUserId);
+                        wcele.setOptUserName(currentUserName);
+                        wcele.setCreateTime(new Date());
+                        ebEngineerService.saveWeColourEngineerLog(wcele);//保存工程师色卡更改记录
+                        ebEngineer.setWeColourAtlaId(wecaid);
+                    }
+                } else {
+                    ebEngineer.setSpectrumValue(null);
+                }
+                ebEngineer.setCertificationTime(new Date());
+                ebEngineer.setIndentifyFlag(indentifyFlag);
+                ebEngineer.setOnlineFlag(1);
+                ebEngineer.setSchAcceptable(1);
+                //信鸽推送
+                XgPushEntity xgPush = xgPushService.getXgPushByUserId(ebEngineer.getId().toString(),"ENGINEER");
+                if(StringUtil.isNotEmpty(xgPush)){
+                    String message = content;
+                    Map<String,Object> param = new HashMap<String,Object>();
+                    JSONObject json = new JSONObject(param);
+                    xingePushUtil.sendXgPush(message, xgPush, json.toString());
+                }
+                this.bonusPoint(ebEngineer.getId(), 3);
+            }
+            ebEngineer.setOptUserId(currentUserId);
+            ebEngineer.setOptUserName(currentUserName);
+            ebEngineerService.update(ebEngineer);
+            //实名认证、光大认证之后，同步数据到boss3（设为领主，nboss编辑）
+            ebEngineerService.syncToBoss3(ebEngineer,userPrincipal);
+            //TODO 用友
+            //yonyouupUYaddVendor(indentifyFlag,ebEngineer);
+            query();
+            JsfUtil.addSuccessMessage("工程师认证状态已经更新成功");
+            return "200";
+        }else{
+            JsfUtil.addErrorMessage("请选择一条数据后操作");
+            return "400";
+        }
+
+    }
+    //赠送神豆操作
+    private boolean bonusPoint(Integer id,Integer scoreTypeOperate){
+        double score = 50;
+        try {
+            EbScoreDetailEntity ebd = new  EbScoreDetailEntity();
+            EbEngineerEntity engineer = ebEngineerService.findById(id);
+            ebd.setCreateTime(new Date());
+            ebd.setScoreType(4);
+            ebd.setScoreTypeOperate(scoreTypeOperate);
+            ebd.setDeleteFlag(0);
+            ebd.setScore(score);
+            Double engscore = engineer.getScore();
+            if(engscore==null){
+                engscore=0.0;
+            }
+            ebd.setCurTotalScore((int)(score+engscore));
+            ebd.setEbEngineerId(id);
+            ebd.setCreateTime(new Date());
+            ebEngineerService.saveScoreDetails(ebd);
+            engineer.setScore((score+engscore));
+            ebEngineerService.update(engineer);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
+        return true;
+    }
+    //选中
+    public void selectTrue(){
+        if(selectEbEngineerList!=null){
+            addEnableClick=addClick(selectEbEngineerList);
+            removeEnableClick=removeClick(selectEbEngineerList);
+            buttonClick=false;
+        }else{
+            addEnableClick=true;
+            removeEnableClick=true;
+            buttonClick=true;
+        }
+    }
+    //取消选中
+    public void selectFalse(){
+        if(selectEbEngineerList!=null){
+            addEnableClick=addClick(selectEbEngineerList);
+            removeEnableClick=removeClick(selectEbEngineerList);
+            buttonClick=false;
+        }else{
+            addEnableClick=true;
+            removeEnableClick=true;
+            buttonClick=true;
+        }
+    }
+    private boolean addClick(EbEngineerEntity ebEngineer){
+        if(ebEngineer.getSpecialStatus()!=null&&ebEngineer.getSpecialStatus()==1){
+            return true;
+        }else{
+            return false;
+        }
+    }
+    private boolean removeClick(EbEngineerEntity ebEngineer){
+        if(ebEngineer.getSpecialStatus()==null||ebEngineer.getSpecialStatus()==0){
+            return true;
+        }else{
+            return false;
+        }
+    }
+    //弹窗展示
+    public void clearInfo(){
+        ebEngineerSpecialStatusRecord=new EbEngineerSpecialStatusRecord();
+    }
+    //添加特殊状态
+    public String updateSpecialStatus(Integer status){
+        String optUserId=authUserBaseService.findBaseUserIdByLoginName(userPrincipal.getName());
+        String optUserName=userPrincipal.getName();
+        if(selectEbEngineerList!=null){
+            if(status==1) {
+                if (ebEngineerSpecialStatusRecord.getSpecialStatus() == null) {
+                    JsfUtil.addErrorMessage("请选择工程师状态");
+                    return "400";
+                }
+                if (ebEngineerSpecialStatusRecord.getAgreementNumber() == null || ebEngineerSpecialStatusRecord.getAgreementNumber().isEmpty()) {
+                    JsfUtil.addErrorMessage("请填写协议编号");
+                    return "400";
+                }
+                List<EbEngineerSpecialStatusRecord> list=ebEngineerSpecialStatusRecordService.ebEngineerSpecialStatusRecordList(selectEbEngineerList.getId(),1,ebEngineerSpecialStatusRecord.getSpecialStatus());
+                if(list!=null&&list.size()>0){
+                    JsfUtil.addErrorMessage("该工程师已有特殊状态，请解除后再添加！");
+                    return "400";
+                }
+                ebEngineerSpecialStatusRecord.setCreateBaseUserId(optUserId);
+                ebEngineerSpecialStatusRecord.setCreateBaseUserName(optUserName);
+                ebEngineerSpecialStatusRecord.setCreateTime(new Date());
+                ebEngineerSpecialStatusRecord.setUpdateTime(new Date());
+                ebEngineerSpecialStatusRecord.setEffectiveFlag(1);//有效
+                ebEngineerSpecialStatusRecord.setEbEngineerId(selectEbEngineerList.getId());
+                ebEngineerSpecialStatusRecordService.create(ebEngineerSpecialStatusRecord);
+                EbEngineerEntity ebEngineer=ebEngineerService.findById(selectEbEngineerList.getId());
+                ebEngineer.setSpecialStatus(ebEngineerSpecialStatusRecord.getSpecialStatus());
+                ebEngineer.setUpdateTime(new Date());
+                ebEngineer.setOptUserId(optUserId);
+                ebEngineer.setOptUserName(optUserName);
+                ebEngineerService.update(ebEngineer);
+                query();
+                addEnableClick=true;
+                removeEnableClick=false;
+                JsfUtil.addSuccessMessage("添加成功");
+            }else if(status==0){
+                if (ebEngineerSpecialStatusRecord.getSpecialStatus() == null) {
+                    JsfUtil.addErrorMessage("请选择工程师状态");
+                    return "400";
+                }
+                List<EbEngineerSpecialStatusRecord> list=ebEngineerSpecialStatusRecordService.ebEngineerSpecialStatusRecordList(selectEbEngineerList.getId(),1,ebEngineerSpecialStatusRecord.getSpecialStatus());
+                if(list==null){
+                    JsfUtil.addErrorMessage("该工程师未添加特殊状态");
+                    return "400";
+                }
+                EbEngineerSpecialStatusRecord record=list.get(0);
+                record.setRemoveBaseUserId(optUserId);
+                record.setRemoveBaseUserName(optUserName);
+                record.setRemoveTime(new Date());
+                record.setUpdateTime(new Date());
+                record.setEffectiveFlag(0);//移除
+                ebEngineerSpecialStatusRecordService.edit(record);
+                EbEngineerEntity ebEngineer=ebEngineerService.findById(selectEbEngineerList.getId());
+                ebEngineer.setSpecialStatus(0);
+                ebEngineer.setUpdateTime(new Date());
+                ebEngineer.setOptUserId(optUserId);
+                ebEngineer.setOptUserName(optUserName);
+                ebEngineerService.update(ebEngineer);
+                query();
+                addEnableClick=false;
+                removeEnableClick=true;
+                JsfUtil.addSuccessMessage("移除成功");
+            }
+        }else{
+            JsfUtil.addErrorMessage("请选择一条数据后操作");
+            return "400";
+        }
+        return "200";
+    }
+
+    /**
+     * 认证通过后同步到用友
+     * @param status
+     * @param ebEngineer
+     */
+    private void yonyouupUYaddVendor(Integer status,EbEngineerEntity ebEngineer) {
+        if (status==2) {
+            try {
+                PropertiesUtil properties = new PropertiesUtil("system.properties");
+                String yonyouupApiUrl = properties.readProperty("yonyouup.api.url");
+                String addVendorUrl = properties.readProperty("finance.UYaddVendor");
+                if (org.apache.commons.lang.StringUtils.isNotEmpty(yonyouupApiUrl) && org.apache.commons.lang.StringUtils.isNotEmpty(addVendorUrl)) {
+                    String url = yonyouupApiUrl + addVendorUrl;
+                    Map<String, String> params = new HashMap();
+                    // biz_id
+                    params.put("biz_id", String.valueOf(DateUtils.getMillis()));
+                    // 供应商编码
+                    params.put("code",  String.valueOf(ebEngineer.getId()));
+                    //供应商名称
+                    params.put("name", ebEngineer.getDecryptRealName()+"("+ebEngineer.getId()+")");
+                    // 所属分类码:02
+                    params.put("sort_code", "03");
+                    String result = HttpRequestUtil.doPost2(url, params);
+                    log.info(url +">>>>"+ result);
+                }
+            } catch (Exception e1) {
+                e1.printStackTrace();
+            }
+        }
+    }
+
+    //省份
+    public void gaProvinceLists() {
+        gaProvinceList = qoOrderService.GgaProvinceList();
+    }
+
+    //城市
+    public void gaCityLists() {
+        if (regionProvinceId != null) {
+            gaCityList = qoOrderService.GaCityList(regionProvinceId);
+        } else {
+            gaCityList = null;
+        }
+    }
+
+    //区或者县
+    public void gaDistricts() {
+        if (regionCityId != null) {
+            gaDistrictList = qoOrderService.gaDistrict(regionCityId);
+        } else {
+            gaDistrictList = null;
+        }
+    }
+
+    //是否领主
+    public String isYesOrNo(Integer type) {
+        if (type != null) {
+            if (type == 4) {
+                return "是";
+            } else {
+                return "否";
+            }
+        }
+        return "";
+    }
+
+    //0未阅读 1是已阅读
+    public String isRead(Integer type) {
+        if (type != null) {
+            if (type == 0) {
+                return "未阅读";
+            } else if (type == 1) {
+                return "已阅读";
+            }
+        }
+        return null;
+    }
+
+    //工程师级别
+    public void weLevelEntities() {
+        weLevelEntityList = qoOrderScheduleService.weLevelEntities();
+    }
+
+    //实名认证状态
+    public String setRealNameVerifications(Integer status) {
+        if (status != null) {
+            if (status == 1) {
+                return "未认证";
+            } else if (status == 3) {
+                return "认证通过";
+            } else if (status == 2) {
+                return "审核失败";
+            } else if (status == 0) {
+                return "审核中";
+            }
+        }
+        return null;
+    }
+    //光大认证状态
+    public String setIndentifyFlags(Integer flag){
+        if(flag!=null){
+            if (flag == 0) {
+                return "未认证";
+            } else if (flag == 2) {
+                return "认证通过";
+            } else if (flag == -1) {
+                return "认证不通过";
+            } else if (flag == 1) {
+                return "认证中";
+            }
+        }
+        return null;
+    }
+    //工程师特殊状态
+    public String switchSpecialStatus(Integer type){
+        if(type!=null){
+            if(type==2){
+                return "内部工程师";
+            }else if(type==1){
+                return "提现需冲抵";
+            }else {
+                return null;
+            }
+        }
+        return null;
+    }
+    //解决科学计数法问题
+    public String setScientific(String money){
+        if(money!=null&&!money.isEmpty()) {
+            BigDecimal bd = new BigDecimal(money);
+            double moneySwitch = bd.setScale(2, BigDecimal.ROUND_HALF_UP).doubleValue();
+            String str = BigDecimal.valueOf(moneySwitch).toPlainString();
+            return str;
+        }
+        return null;
+    }
+    //科学计数法
+    public String switchMoney(Double moneys){
+        if(BaseUtil.isNotEmpty(moneys)){
+            BigDecimal bd = new BigDecimal(moneys);
+            double moneySwitch =   bd.setScale(2,   BigDecimal.ROUND_HALF_UP).doubleValue();
+            String str = BigDecimal.valueOf(moneySwitch).toPlainString();
+            return str;
+        }
+        return null;
+    }
+
+    //弹窗添加工程师备注
+    public void clearRemark(){
+        ebEngineerRemark = new EbEngineerRemark();
+    }
+    //添加工程师备注
+    public String addEbEngineerRemark(){
+        if(selectEbEngineerList!=null){
+            String optUserId=authUserBaseService.findBaseUserIdByLoginName(userPrincipal.getName());
+            if(ebEngineerRemark.getStatus()==null){
+                JsfUtil.addErrorMessage("请选择工程师状态");
+                return "400";
+            }
+            if(ebEngineerRemark.getRemark()==null||ebEngineerRemark.getRemark().isEmpty()){
+                JsfUtil.addErrorMessage("请填写备注");
+                return "400";
+            }
+            ebEngineerRemark.setEngineerId(selectEbEngineerList.getId());
+            ebEngineerRemark.setCreateTime(new Date());
+            ebEngineerRemark.setCreateUserId(optUserId);
+            ebEngineerRemark.setCreateUserName(userPrincipal.getName());
+            ebEngineerRemark.setValidFlag("1");
+            ebEngineerRemark.setDeleteFlag("0");
+            ebEngineerRemark.setUpdateTime(new Date());
+            ebEngineerRemark.setUpdateUserId(optUserId);
+            ebEngineerRemark.setUpdateUserName(userPrincipal.getName());
+            ebEngineerService.createEngineerRemark(ebEngineerRemark);
+            JsfUtil.addSuccessMessage("添加成功");
+        }else {
+            JsfUtil.addErrorMessage("请选择一条数据后操作");
+            return "400";
+        }
+        return "200";
+    }
+
+    //查询企业信息
+    public void searchEnterpriseInfo(){
+        uuEnterpriseInfoList = new LazyUuEnterpriseInfoDataModel(searchUuEnterpriseInfo,uuEnterpriseInfoService,true);
+    }
+    //选择企业信息
+    public String selectEnterpriseInfo() {
+        if(selectUuEnterpriseInfo!=null){
+            leaderCompany = selectUuEnterpriseInfo.getEiName();
+        }else{
+            JsfUtil.addErrorMessage("请选择一条数据后操作");
+            return "400";
+        }
+        return "200";
+
+    }
+
+    //选择企业信息
+    public String selectEnterpriseInfoEdit() {
+        if(selectUuEnterpriseInfo!=null){
+            ebEngineerCreate.setCompany(selectUuEnterpriseInfo.getEiName());
+        }else{
+            JsfUtil.addErrorMessage("请选择一条数据后操作");
+            return "400";
+        }
+        return "200";
+    }
+    //查询天眼查信息
+    public void searchCompanyInfo(){
+        try {
+            createUuEnterpriseInfo = uuEnterpriseInfoService.findBasic(searchCompany);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+    //添加天眼查信息
+    public String createCompanyInfo(){
+        try {
+            String result = uuEnterpriseInfoService.createInfo(createUuEnterpriseInfo);
+            if(result.equals("操作成功")){
+                JsfUtil.addSuccessMessage("添加成功");
+                return "200";
+            }else{
+                JsfUtil.addErrorMessage(result);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return "400";
+    }
+
+
+    public EbEngineerEntity getSelectEbEngineerList() {
+        return selectEbEngineerList;
+    }
+
+    public void setSelectEbEngineerList(EbEngineerEntity selectEbEngineerList) {
+        this.selectEbEngineerList = selectEbEngineerList;
+    }
+
+    public EbEngineerEntity getEbEngineer() {
+        return ebEngineer;
+    }
+
+    public void setEbEngineer(EbEngineerEntity ebEngineer) {
+        this.ebEngineer = ebEngineer;
+    }
+
+    public Integer[] getDomains() {
+        return domains;
+    }
+
+    public void setDomains(Integer[] domains) {
+        this.domains = domains;
+    }
+
+    public Integer[] getCerts() {
+        return certs;
+    }
+
+    public void setCerts(Integer[] certs) {
+        this.certs = certs;
+    }
+
+    public List<GaProvinceEntity> getGaProvinceList() {
+        return gaProvinceList;
+    }
+
+    public void setGaProvinceList(List<GaProvinceEntity> gaProvinceList) {
+        this.gaProvinceList = gaProvinceList;
+    }
+
+    public List<GaCityEntity> getGaCityList() {
+        return gaCityList;
+    }
+
+    public void setGaCityList(List<GaCityEntity> gaCityList) {
+        this.gaCityList = gaCityList;
+    }
+
+    public List<GaDistrictEntity> getGaDistrictList() {
+        return gaDistrictList;
+    }
+
+    public void setGaDistrictList(List<GaDistrictEntity> gaDistrictList) {
+        this.gaDistrictList = gaDistrictList;
+    }
+
+    public Integer getRegionProvinceId() {
+        return regionProvinceId;
+    }
+
+    public void setRegionProvinceId(Integer regionProvinceId) {
+        this.regionProvinceId = regionProvinceId;
+    }
+
+    public Integer getRegionCityId() {
+        return regionCityId;
+    }
+
+    public void setRegionCityId(Integer regionCityId) {
+        this.regionCityId = regionCityId;
+    }
+
+    public Integer getRegionDistrictId() {
+        return regionDistrictId;
+    }
+
+    public void setRegionDistrictId(Integer regionDistrictId) {
+        this.regionDistrictId = regionDistrictId;
+    }
+
+    public EbEngineerEntity getEbEngineerCreate() {
+        return ebEngineerCreate;
+    }
+
+    public void setEbEngineerCreate(EbEngineerEntity ebEngineerCreate) {
+        this.ebEngineerCreate = ebEngineerCreate;
+    }
+
+    public List<WeLevelEntity> getWeLevelEntityList() {
+        return weLevelEntityList;
+    }
+
+    public void setWeLevelEntityList(List<WeLevelEntity> weLevelEntityList) {
+        this.weLevelEntityList = weLevelEntityList;
+    }
+
+    public EbEngineerEntity getEbEngineerEdit() {
+        return ebEngineerEdit;
+    }
+
+    public void setEbEngineerEdit(EbEngineerEntity ebEngineerEdit) {
+        this.ebEngineerEdit = ebEngineerEdit;
+    }
+
+    public String getPassword() {
+        return password;
+    }
+
+    public void setPassword(String password) {
+        this.password = password;
+    }
+
+    public String getRealName() {
+        return realName;
+    }
+
+    public void setRealName(String realName) {
+        this.realName = realName;
+    }
+
+    public String getPhoneNumber() {
+        return phoneNumber;
+    }
+
+    public void setPhoneNumber(String phoneNumber) {
+        this.phoneNumber = phoneNumber;
+    }
+
+    public String getMoney() {
+        return money;
+    }
+
+    public void setMoney(String money) {
+        this.money = money;
+    }
+
+    public List<EbEngineerEntity> getEbEngineerTeamList() {
+        return ebEngineerTeamList;
+    }
+
+    public void setEbEngineerTeamList(List<EbEngineerEntity> ebEngineerTeamList) {
+        this.ebEngineerTeamList = ebEngineerTeamList;
+    }
+
+    public List<EbEngineerEntity> getSelectEbEngineerTeamList() {
+        return selectEbEngineerTeamList;
+    }
+
+    public void setSelectEbEngineerTeamList(List<EbEngineerEntity> selectEbEngineerTeamList) {
+        this.selectEbEngineerTeamList = selectEbEngineerTeamList;
+    }
+
+    public String getIdCard() {
+        return idCard;
+    }
+
+    public void setIdCard(String idCard) {
+        this.idCard = idCard;
+    }
+
+    public String getFlag() {
+        return flag;
+    }
+
+    public void setFlag(String flag) {
+        this.flag = flag;
+    }
+
+    public EbEduBackgroundEntity getEbEduBackgroundEntity() {
+        return ebEduBackgroundEntity;
+    }
+
+    public void setEbEduBackgroundEntity(EbEduBackgroundEntity ebEduBackgroundEntity) {
+        this.ebEduBackgroundEntity = ebEduBackgroundEntity;
+    }
+
+    public Integer getStatus() {
+        return status;
+    }
+
+    public void setStatus(Integer status) {
+        this.status = status;
+    }
+
+    public String getVerifyStatus() {
+        return verifyStatus;
+    }
+
+    public void setVerifyStatus(String verifyStatus) {
+        this.verifyStatus = verifyStatus;
+    }
+
+    public String getAcceptableNotReason() {
+        return acceptableNotReason;
+    }
+
+    public void setAcceptableNotReason(String acceptableNotReason) {
+        this.acceptableNotReason = acceptableNotReason;
+    }
+
+    public EbEngineerEntity getShowEbEngineer() {
+        return showEbEngineer;
+    }
+
+    public void setShowEbEngineer(EbEngineerEntity showEbEngineer) {
+        this.showEbEngineer = showEbEngineer;
+    }
+
+    public String getNotPassReason() {
+        return notPassReason;
+    }
+
+    public void setNotPassReason(String notPassReason) {
+        this.notPassReason = notPassReason;
+    }
+
+    public boolean isEnableShow() {
+        return enableShow;
+    }
+
+    public void setEnableShow(boolean enableShow) {
+        this.enableShow = enableShow;
+    }
+
+    public Integer getRealNameVerification() {
+        return realNameVerification;
+    }
+
+    public void setRealNameVerification(Integer realNameVerification) {
+        this.realNameVerification = realNameVerification;
+    }
+
+    public EbEngineerSpecialStatusRecord getEbEngineerSpecialStatusRecord() {
+        return ebEngineerSpecialStatusRecord;
+    }
+
+    public void setEbEngineerSpecialStatusRecord(EbEngineerSpecialStatusRecord ebEngineerSpecialStatusRecord) {
+        this.ebEngineerSpecialStatusRecord = ebEngineerSpecialStatusRecord;
+    }
+
+    public boolean isAddEnableClick() {
+        return addEnableClick;
+    }
+
+    public void setAddEnableClick(boolean addEnableClick) {
+        this.addEnableClick = addEnableClick;
+    }
+
+    public boolean isRemoveEnableClick() {
+        return removeEnableClick;
+    }
+
+    public void setRemoveEnableClick(boolean removeEnableClick) {
+        this.removeEnableClick = removeEnableClick;
+    }
+
+    public boolean isButtonClick() {
+        return buttonClick;
+    }
+
+    public void setButtonClick(boolean buttonClick) {
+        this.buttonClick = buttonClick;
+    }
+
+    public EbEngineerRemark getEbEngineerRemark() {
+        return ebEngineerRemark;
+    }
+
+    public void setEbEngineerRemark(EbEngineerRemark ebEngineerRemark) {
+        this.ebEngineerRemark = ebEngineerRemark;
+    }
+
+    public String getLeaderCompany() {
+        return leaderCompany;
+    }
+
+    public void setLeaderCompany(String leaderCompany) {
+        this.leaderCompany = leaderCompany;
+    }
+
+    public String[] getContractLabel() {
+        return contractLabel;
+    }
+
+    public void setContractLabel(String[] contractLabel) {
+        this.contractLabel = contractLabel;
+    }
+
+    public boolean isShowBtn() {
+        return isShowBtn;
+    }
+
+    public void setShowBtn(boolean showBtn) {
+        isShowBtn = showBtn;
+    }
+
+    public LazyUuEnterpriseInfoDataModel getUuEnterpriseInfoList() {
+        return uuEnterpriseInfoList;
+    }
+
+    public void setUuEnterpriseInfoList(LazyUuEnterpriseInfoDataModel uuEnterpriseInfoList) {
+        this.uuEnterpriseInfoList = uuEnterpriseInfoList;
+    }
+
+    public UuEnterpriseInfo getSelectUuEnterpriseInfo() {
+        return selectUuEnterpriseInfo;
+    }
+
+    public void setSelectUuEnterpriseInfo(UuEnterpriseInfo selectUuEnterpriseInfo) {
+        this.selectUuEnterpriseInfo = selectUuEnterpriseInfo;
+    }
+
+    public UuEnterpriseInfo getSearchUuEnterpriseInfo() {
+        return searchUuEnterpriseInfo;
+    }
+
+    public void setSearchUuEnterpriseInfo(UuEnterpriseInfo searchUuEnterpriseInfo) {
+        this.searchUuEnterpriseInfo = searchUuEnterpriseInfo;
+    }
+
+    public UuEnterpriseInfo getCreateUuEnterpriseInfo() {
+        return createUuEnterpriseInfo;
+    }
+
+    public void setCreateUuEnterpriseInfo(UuEnterpriseInfo createUuEnterpriseInfo) {
+        this.createUuEnterpriseInfo = createUuEnterpriseInfo;
+    }
+
+    public String getSearchCompany() {
+        return searchCompany;
+    }
+
+    public void setSearchCompany(String searchCompany) {
+        this.searchCompany = searchCompany;
+    }
+}
