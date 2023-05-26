@@ -1,0 +1,649 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml"
+      xmlns:ui="http://java.sun.com/jsf/facelets"
+      xmlns:h="http://java.sun.com/jsf/html"
+      xmlns:p="http://primefaces.org/ui"
+      xmlns:pt="http://xmlns.jcp.org/jsf/passthrough"
+      xmlns:pu="http://primefaces.org/ultima"
+      xmlns:f="http://java.sun.com/jsf/core">
+<h:head>
+</h:head>
+<ui:composition template="/WEB-INF/template.xhtml">
+    <ui:define name="content">
+        <h:form id="form">
+            <p:growl id="growl" showDetail="true" life="5000"/>
+            <p:toolbar>
+                <f:facet name="left">
+                    <p:commandButton type="push" value="查询" image="fa fa-search"
+                                     action="#{ebEngineerListController.query}" update="test0"/>
+                    <p:commandButton type="push" value="新建" image="fa fa-pencil-square-o"
+                                     action="#{ebEngineerListController.switchToAddEngineer}" update="form" rendered="#{ebEngineerListController.showBtn}"/>
+                    <p:commandButton type="push" value="编辑" image="fa fa-pencil" id="editBtn"
+                                     action="#{ebEngineerListController.switchToEditEngineer}" disabled="#{ebEngineerListController.buttonClick}" update="growl" rendered="#{ebEngineerListController.showBtn}"/>
+                    <p:commandButton type="push" value="设为领主" id="leaderBtn" action="#{ebEngineerListController.initDialog}"
+                                     onclick="PF('leaderDialog').show()"
+                                     disabled="#{ebEngineerListController.buttonClick}"
+                                     update="growl,leaderForm" rendered="#{ebEngineerListController.showBtn}"/>
+                    <p:commandButton type="push" value="查看团员" id="memberBtn" action="#{ebEngineerListController.showEngineerTeamList}"
+                                     disabled="#{ebEngineerListController.buttonClick}"
+                                     update="growl"/>
+                    <p:commandButton type="push" value="查看详细资料" image="fa fa-eye" id="detailBtn"
+                                     disabled="#{ebEngineerListController.buttonClick}"
+                                     action="#{ebEngineerListController.switchToEngineersInfo}"/>
+                    <p:menuButton value="审核" style="margin-left: 2px;" id="verifyBtn" rendered="#{ebEngineerListController.showBtn}">
+                        <p:menuitem type="push" value="审核证书" image="fa fa-user-times" id="certBtn"
+                                    disabled="#{ebEngineerListController.buttonClick}"
+                                    action="#{ebEngineerListController.checkCertificate}" update="growl"/>
+                        <p:menuitem type="push" value="审核教育背景" image="fa fa-user-times" id="eduBtn"
+                                    disabled="#{ebEngineerListController.buttonClick}"
+                                    action="#{ebEngineerListController.showEduBackground}" update="growl"/>
+                        <p:menuitem type="push" value="审核身份证照片" image="fa fa-user-times" id="picBtn"
+                                    disabled="#{ebEngineerListController.buttonClick}"
+                                    action="#{ebEngineerListController.showIdCardPic}" onclick="PF('viewDialog').show()"
+                                    update="growl,:viewDialog:realnameDecrypt,:viewDialog:idcardDecrypt,:viewDialog:idcardPictureUrl,:viewDialog:idcardApprovalStatue"/>
+                        <p:menuitem type="push" value="光大认证通过" image="fa fa-user-times" id="gdBtn"
+                                    disabled="#{ebEngineerListController.buttonClick}"
+                                    action="#{ebEngineerListController.setIndentifyFlag(2)}" update="growl,test0"/>
+                    </p:menuButton>
+
+                    <p:menuButton value="更多" id="addOrRemove" style="margin-left: 2px;">
+                        <p:menuitem type="push" value="可接单"
+                                    action="#{ebEngineerListController.setSchAcceptable(1)}"
+                                    disabled="#{ebEngineerListController.buttonClick}"
+                                    update="form"   rendered="#{ebEngineerListController.showBtn}"/>
+                        <p:menuitem type="push" value="不可接单"
+                                    onclick="PF('auditInfo').show()"
+                                    disabled="#{ebEngineerListController.buttonClick}"
+                                    update="growl"   rendered="#{ebEngineerListController.showBtn}"/>
+                        <p:menuitem type="push" value="添加工程师备注" id="addRemarks"
+                                    onclick="PF('addRemarks').show()"
+                                    action="#{ebEngineerListController.clearRemark}"
+                                    update="growl,:addRemarksDialog"
+                                    disabled="#{ebEngineerListController.addEnableClick}" />
+                        <p:menuitem type="push" value="添加特殊状态" id="add"
+                                    onclick="PF('addStatus').show()"
+                                    action="#{ebEngineerListController.clearInfo}"
+                                    update="growl,:addStatusDialog:status,:addStatusDialog:reason"
+                                    disabled="#{ebEngineerListController.addEnableClick}"   rendered="#{ebEngineerListController.showBtn}"/>
+                        <p:menuitem type="push" value="解除特殊状态" id="remove"
+                                    action="#{ebEngineerListController.clearInfo}"
+                                    onclick="PF('removeStatus').show()"
+                                    update="growl,:removeStatusDialog:type"
+                                    disabled="#{ebEngineerListController.removeEnableClick}"   rendered="#{ebEngineerListController.showBtn}"/>
+                        <p:menuitem type="push" value="工程师交易流水"
+                                    action="#{ebEngineerListController.switchToWasteBook}"
+                                    disabled="#{ebEngineerListController.buttonClick}"   rendered="#{ebEngineerListController.showBtn}"/>
+                        <p:menuitem type="push" value="添加擅长领域"
+                                    action="#{ebEngineerListController.addEngineerDomain}"
+                                    disabled="#{ebEngineerListController.buttonClick}"   rendered="#{ebEngineerListController.showBtn}"/>
+                    </p:menuButton>
+                </f:facet>
+            </p:toolbar>
+            <h:panelGrid columns="7" border="0"
+                         cellpadding="10" cellspacing="0">
+                <p:outputLabel value="工号" for="id" styleClass="col-sm-3 control-label"/>
+                <p:inputText id="id" value="#{ebEngineerListController.ebEngineer.id}" pt:placeholder="">
+                </p:inputText>
+                <p:outputLabel value="用户名" for="nickname" styleClass="col-sm-3 control-label"/>
+                <p:inputText id="nickname" value="#{ebEngineerListController.ebEngineer.nickName}" pt:placeholder="">
+                </p:inputText>
+                <p:outputLabel value="真实姓名" for="realname" styleClass="col-sm-3 control-label"/>
+                <p:inputText id="realname" value="#{ebEngineerListController.ebEngineer.realnameCode}" pt:placeholder="">
+                </p:inputText>
+                <span style="color: #2ebcfc;cursor:pointer;" onclick="isPlay()" id="button">展开∨</span>
+            </h:panelGrid>
+            <script type="text/javascript">
+                function isPlay() {
+                    var searchCriteria = document.getElementById("searchCriteria");
+                    var button = document.getElementById("button");
+
+                    if (searchCriteria.style.display == 'none') {
+                        searchCriteria.style.display = 'block';
+                        button.innerHTML = "折叠∧";
+                    } else {
+                        searchCriteria.style.display = 'none';
+                        button.innerHTML = "展开∨";
+                    }
+                }
+            </script>
+            <div id="searchCriteria" style="display: none;">
+                <h:panelGrid columns="6" border="0"
+                             cellpadding="10" cellspacing="0">
+                    <p:outputLabel value="领主企业名称" for="company" styleClass="col-sm-3 control-label"/>
+                    <p:inputText id="company" value="#{ebEngineerListController.ebEngineer.company}" pt:placeholder="">
+                    </p:inputText>
+                    <p:outputLabel value="手机号" for="mobileTel" styleClass="col-sm-3 control-label"/>
+                    <p:inputText id="mobileTel" value="#{ebEngineerListController.ebEngineer.mobileTel}"
+                                 pt:placeholder="">
+                    </p:inputText>
+                    <p:outputLabel value="工程师类型" for="ebEngineerType" styleClass="col-sm-3 control-label"/>
+                    <p:selectOneMenu id="ebEngineerType" value="#{ebEngineerListController.ebEngineer.engineerType}"
+                                     style="width: 180px">
+                        <f:selectItem itemLabel="请选择" itemValue=""/>
+                        <f:selectItem itemLabel="个人工程师" itemValue="1"/>
+                        <f:selectItem itemLabel="企业领主" itemValue="4"/>
+                    </p:selectOneMenu>
+                    <p:outputLabel value="地址距离匹配" for="receiveAllAddress" styleClass="col-sm-3 control-label"/>
+                    <p:inputText id="receiveAllAddress" value="#{ebEngineerListController.ebEngineer.receiveAllAddress}"
+                                 pt:placeholder="">
+                    </p:inputText>
+                    <p:outputLabel value="特殊状态" for="specialStatus" styleClass="col-sm-3 control-label"/>
+                    <p:selectOneMenu id="specialStatus"
+                                     value="#{ebEngineerListController.ebEngineer.specialStatus}"
+                                     style="width: 180px">
+                        <f:selectItem itemLabel="请选择" itemValue=""/>
+                        <f:selectItem itemLabel="内部工程师" itemValue="2"/>
+                        <f:selectItem itemLabel="提现需冲抵" itemValue="1"/>
+                    </p:selectOneMenu>
+                    <p:outputLabel value="实名认证状态" for="realNameVerification" styleClass="col-sm-3 control-label"/>
+                    <p:selectOneMenu id="realNameVerification"
+                                     value="#{ebEngineerListController.ebEngineer.realNameVerification}"
+                                     style="width: 180px">
+                        <f:selectItem itemLabel="请选择" itemValue=""/>
+                        <f:selectItem itemLabel="待审核" itemValue="0"/>
+                        <f:selectItem itemLabel="未认证" itemValue="1"/>
+                        <f:selectItem itemLabel="认证通过" itemValue="3"/>
+                        <f:selectItem itemLabel="认证失败" itemValue="2"/>
+                    </p:selectOneMenu>
+                    <p:outputLabel value="光大认证状态" for="indentifyFlag" styleClass="col-sm-3 control-label"/>
+                    <p:selectOneMenu id="indentifyFlag" value="#{ebEngineerListController.ebEngineer.indentifyFlag}"
+                                     style="width: 180px">
+                        <f:selectItem itemLabel="请选择" itemValue=""/>
+                        <f:selectItem itemLabel="未认证" itemValue="0"/>
+                        <f:selectItem itemLabel="认证中" itemValue="1"/>
+                        <f:selectItem itemLabel="认证通过" itemValue="2"/>
+                        <f:selectItem itemLabel="认证不通过" itemValue="-1"/>
+                    </p:selectOneMenu>
+                    <p:outputLabel value="资质证书" for="certificate" styleClass="col-sm-3 control-label"/>
+                    <p:selectCheckboxMenu id="certificate" value="#{ebEngineerListController.certs}" label="Cities"
+                                          multiple="true"
+                                          filter="true" filterMatchMode="startsWith" style="width: 180px">
+                        <f:selectItems value="#{dictionaryController.weBrandCertEntitys()}" var="brandCert"
+                                       itemLabel="#{brandCert.certEname}" itemValue="#{brandCert.id}"/>
+                    </p:selectCheckboxMenu>
+                    <p:outputLabel value="技能领域" for="domains" styleClass="col-sm-3 control-label"/>
+                    <p:selectCheckboxMenu id="domains" value="#{ebEngineerListController.domains}" label="Cities"
+                                          multiple="true"
+                                          filter="true" filterMatchMode="startsWith" style="width: 180px">
+                        <f:selectItems value="#{dictionaryController.domainList()}" var="domainInfo"
+                                       itemLabel="#{domainInfo.name}" itemValue="#{domainInfo.id}"/>
+                    </p:selectCheckboxMenu>
+                    <p:outputLabel value="是否接单" for="userReceiveStatus" styleClass="col-sm-3 control-label"/>
+                    <p:selectOneMenu id="userReceiveStatus"
+                                     value="#{ebEngineerListController.ebEngineer.userReceiveStatus}"
+                                     style="width: 180px">
+                        <f:selectItem itemLabel="请选择" itemValue=""/>
+                        <f:selectItem itemLabel="是" itemValue="1"/>
+                        <f:selectItem itemLabel="否" itemValue="0"/>
+                    </p:selectOneMenu>
+                    <p:outputLabel value="接单省份" for="provinceId" styleClass="col-sm-3 control-label"/>
+                    <p:selectOneMenu id="provinceId" value="#{ebEngineerListController.regionProvinceId}"
+                                     style="width: 180px">
+                        <f:selectItem itemLabel="请选择" itemValue=""/>
+                        <f:selectItems value="#{ebEngineerListController.gaProvinceList}" var="gPList"
+                                       itemLabel="#{gPList.name}" itemValue="#{gPList.id}"/>
+                        <p:ajax update="cityId" event="change" listener="#{ebEngineerListController.gaCityLists}"/>
+                    </p:selectOneMenu>
+                    <p:outputLabel value="接单城市" for="cityId" styleClass="col-sm-3 control-label"/>
+                    <p:selectOneMenu id="cityId" value="#{ebEngineerListController.regionCityId}" style="width: 180px">
+                        <f:selectItem itemLabel="请选择" itemValue=""/>
+                        <f:selectItems value="#{ebEngineerListController.gaCityList}" var="gCList"
+                                       itemLabel="#{gCList.acceptCityName}" itemValue="#{gCList.id}"/>
+                        <p:ajax update="districtId" event="change" listener="#{ebEngineerListController.gaDistricts}"/>
+                    </p:selectOneMenu>
+                    <p:outputLabel value="接单地区" for="districtId" styleClass="col-sm-3 control-label"/>
+                    <p:selectOneMenu id="districtId" value="#{ebEngineerListController.regionDistrictId}"
+                                     style="width: 180px">
+                        <f:selectItem itemLabel="请选择" itemValue=""/>
+                        <f:selectItems value="#{ebEngineerListController.gaDistrictList}" var="gDList"
+                                       itemLabel="#{gDList.name}" itemValue="#{gDList.id}"/>
+                    </p:selectOneMenu>
+                    <p:outputLabel value="合同标签" for="contractLabel" styleClass="col-sm-3 control-label"/>
+                    <p:selectCheckboxMenu id="contractLabel" value="#{ebEngineerListController.contractLabel}" label="Cities"
+                                          multiple="true"
+                                          filter="true" filterMatchMode="startsWith" style="width: 180px">
+                        <f:selectItems value="#{dictionaryController.contractLabelList()}" var="labelVar"
+                                       itemLabel="#{labelVar.labelName}" itemValue="#{labelVar.labelName}"/>
+                    </p:selectCheckboxMenu>
+
+                    <p:outputLabel value="工单标签" for="orderSchLabel" styleClass="col-sm-3 control-label"/>
+                    <p:inputText id="orderSchLabel" value="#{ebEngineerListController.ebEngineer.orderSchLabel}"
+                                 pt:placeholder="">
+                    </p:inputText>
+                    <p:outputLabel value="工程师接单数量" for="@next" styleClass="col-sm-3 control-label"/>
+                    <p:selectOneMenu id="orderReceivingNumber" value="#{ebEngineerListController.ebEngineer.orderReceivingNumber}"
+                                     style="width: 180px">
+                        <f:selectItem itemLabel="请选择" itemValue=""/>
+                        <f:selectItem itemLabel="0" itemValue="1"/>
+                        <f:selectItem itemLabel="1-50" itemValue="2"/>
+                        <f:selectItem itemLabel="51-100" itemValue="3"/>
+                        <f:selectItem itemLabel=">100" itemValue="4"/>
+                    </p:selectOneMenu>
+
+                    <p:outputLabel value="技术能力介绍" for="introduction" styleClass="col-sm-3 control-label"/>
+                    <p:inputText id="introduction" value="#{ebEngineerListController.ebEngineer.introduction}"
+                                 pt:placeholder="">
+                    </p:inputText>
+                    <p:outputLabel value="工程师备注" for="engineerRemark" styleClass="col-sm-3 control-label"/>
+                    <p:inputText id="engineerRemark" value="#{ebEngineerListController.ebEngineer.engineerRemark}"
+                                 pt:placeholder="">
+                    </p:inputText>
+                    <p:outputLabel value="个人信息是否填写完成" for="isFinish" styleClass="col-sm-3 control-label"/>
+                    <p:selectOneMenu id="isFinish" value="#{ebEngineerListController.ebEngineer.isFinish}"
+                                     style="width: 180px">
+                        <f:selectItem itemLabel="请选择" itemValue=""/>
+                        <f:selectItem itemLabel="是" itemValue="1"/>
+                        <f:selectItem itemLabel="否" itemValue="0"/>
+                    </p:selectOneMenu>
+                </h:panelGrid>
+            </div>
+
+            <p:dataTable id="test0" value="#{ebEngineerListController.ebEngineerList}" var="engineer"
+                         rows="20"
+                         emptyMessage=""
+                         paginator="true"
+                         lazy="true"
+                         paginatorTemplate="{CurrentPageReport} {FirstPageLink} {PreviousPageLink} {PageLinks} {NextPageLink} {LastPageLink} {RowsPerPageDropdown}"
+                         rowsPerPageTemplate="10,20,50,100,150"
+                         editable="true"
+                         editMode="cell"
+                         rowKey="#{value.id}"
+                         rowIndexVar="rowIndex"
+                         paginatorPosition="bottom"
+                         scrollWidth="100%"
+                         scrollable="true"
+                         liveResize="true"
+                         rowSelectMode = "add"
+                         selectionMode="single"
+                         draggableColumns="true"
+                         resizableColumns="true"
+                         resizeMode="expand"
+                         frozenColumns="1"
+                         scrollHeight="400"
+                         selection="#{ebEngineerListController.selectEbEngineerList}"
+                         style="margin-top: 20px;"
+            >
+                <p:ajax event="rowSelect" listener="#{ebEngineerListController.selectTrue}" update=":form:addOrRemove,:form:editBtn,:form:leaderBtn,:form:memberBtn,:form:detailBtn,:form:verifyBtn"/>
+                <p:ajax event="rowUnselect" listener="#{ebEngineerListController.selectFalse}" update=":form:addOrRemove,:form:editBtn,:form:leaderBtn,:form:memberBtn,:form:detailBtn,:form:verifyBtn"/>
+                <p:column headerText="序号" style="width:30px">
+                    <h:outputText value="#{rowIndex+1}"/>
+                </p:column>
+                <p:column headerText="色卡" style="width: 40px;text-align: center" selectRow="false">
+                    <h:outputText escape="false" value="#{dictionaryController.selectColour(engineer.weColourAtlaId)}"/>
+                </p:column>
+                <p:column headerText="工号" style="width: 80px;text-align: left" selectRow="false">
+                    <h:outputText value="#{engineer.id}"/>
+                </p:column>
+                <p:column headerText="用户名" style="width: 140px;text-align: left" selectRow="false">
+                    <h:outputText value="#{engineer.nickName}"/>
+                </p:column>
+                <p:column headerText="真实姓名" style="width: 80px;text-align: left" selectRow="false">
+                    <h:outputText value="#{engineer.decryptRealName}"/>
+                </p:column>
+                <p:column headerText="工单数" style="width: 80px;text-align: left" selectRow="false">
+                    <h:outputText value="#{engineer.orderNum}"/>
+                </p:column>
+                <p:column headerText="领主行业" style="width: 120px;text-align: left" selectRow="false">
+                    <h:outputText value="#{engineer.lordVocationId}"/>
+                </p:column>
+                <p:column headerText="领主企业名称" style="width: 120px;text-align: left" selectRow="false">
+                    <h:outputText value="#{engineer.company}"/>
+                </p:column>
+                <p:column headerText="手机号码" style="width: 100px;text-align: right" selectRow="false">
+                    <h:outputText value="#{engineer.decryptMobiletel}"/>
+                </p:column>
+                <p:column headerText="是否领主" style="width: 80px;text-align: left" selectRow="false">
+                    <h:outputText value="#{ebEngineerListController.isYesOrNo(engineer.engineerType)}"/>
+                </p:column>
+                <p:column headerText="收货地址"  style="width: 200px;text-align: left">
+                    <h:outputText value="#{engineer.receiveAllAddress}"/>
+                </p:column>
+                <p:column headerText="距离实施地址距离（km）"  style="width: 160px;text-align: left">
+                    <h:outputText value="#{engineer.distance}">
+                        <f:convertNumber currencySymbol="0.00" type="number" />
+                    </h:outputText>
+                </p:column>
+                <p:column headerText="团队名称" style="width: 100px;text-align: right" selectRow="false">
+                    <h:outputText value="#{engineer.teamName}"/>
+                </p:column>
+                <p:column headerText="团队人数" style="width: 100px;text-align: right" selectRow="false">
+                    <h:outputText value="#{engineer.num4Team}"/>
+                </p:column>
+                <p:column headerText="资质证书" style="width: 200px;text-align: left" selectRow="false">
+                    <h:outputText value="#{engineer.cert}"/>
+                </p:column>
+                <p:column headerText="工单标签" style="width: 200px;text-align: left" selectRow="false">
+                    <h:outputText value="#{engineer.orderSchLabel}"/>
+                </p:column>
+                <p:column headerText="账户余额" style="width: 100px;text-align: right" selectRow="false">
+                    <h:outputText value="#{ebEngineerListController.setScientific(engineer.decryptMoney)}"/>
+                </p:column>
+                <p:column headerText="擅长领域待审核数量" style="width: 130px;text-align: left" selectRow="false">
+                    <h:outputText value="#{engineer.domainSumBef}"/>
+                </p:column>
+                <p:column headerText="工程师类型" style="width: 100px;text-align: right" selectRow="false">
+                    <h:outputText value="#{globalDataAndTransform.setEngineerType(engineer.engineerType)}"/>
+                </p:column>
+                <p:column headerText="工程师状态" style="width: 100px;text-align: right" selectRow="false">
+                    <h:outputText value="#{globalDataAndTransform.setOnlineFlag(engineer.onlineFlag)}"/>
+                </p:column>
+                <p:column headerText="工程师手册" style="width: 100px;text-align: right" selectRow="false">
+                    <h:outputText value="#{ebEngineerListController.isRead(engineer.handbookReadbit)}"/>
+                </p:column>
+                <p:column headerText="实名认证状态" style="width: 100px;text-align: right" selectRow="false">
+                    <h:outputText
+                            value="#{ebEngineerListController.setRealNameVerifications(engineer.realNameVerification)}"/>
+                </p:column>
+                <p:column headerText="光大认证状态" style="width: 100px;text-align: right" selectRow="false">
+                    <h:outputText value="#{ebEngineerListController.setIndentifyFlags(engineer.indentifyFlag)}"/>
+                </p:column>
+                <p:column headerText="是否可接单" style="width: 100px;text-align: right" selectRow="false">
+                    <h:outputText value="#{globalDataAndTransform.switchSchAcceptable(engineer.schAcceptable)}"/>
+                </p:column>
+                <p:column headerText="我的十二分" style="width: 100px;text-align: right" selectRow="false">
+                    <h:outputText value="#{ebEngineerListController.isRead(engineer.mypointsReadbit)}"/>
+                </p:column>
+                <p:column headerText="保密协议" style="width: 100px;text-align: right" selectRow="false">
+                    <h:outputText value="#{ebEngineerListController.isRead(engineer.secrecyReadBit)}"/>
+                </p:column>
+                <p:column headerText="是否接单" style="width: 100px;text-align: right" selectRow="false">
+                    <h:outputText value="#{globalDataAndTransform.isOrNo(engineer.userReceiveStatus)}"/>
+                </p:column>
+                <p:column headerText="备注" style="width: 100px;text-align: right" selectRow="false">
+                    <h:outputText value="#{engineer.engineerDesc}"/>
+                </p:column>
+                <p:column headerText="领域标签" style="width: 200px;text-align: left" selectRow="false">
+                    <h:outputText value="#{engineer.domain}"/>
+                </p:column>
+                <p:column headerText="合同标签" style="width: 200px;text-align: left" selectRow="false">
+                    <h:outputText value="#{engineer.orderLabel}"/>
+                </p:column>
+                <p:column headerText="推荐人ID" style="width: 100px;text-align: right" selectRow="false">
+                    <h:outputText value="#{engineer.recommendId}"/>
+                </p:column>
+                <p:column headerText="工作年限" style="width: 100px;text-align: right" selectRow="false">
+                    <h:outputText value="#{engineer.workingTimeStr}"/>
+                </p:column>
+                <p:column headerText="接单省" style="width: 80px;text-align: left" selectRow="false">
+                    <h:outputText value="#{engineer.regionProvince}"/>
+                </p:column>
+                <p:column headerText="接单区域" style="width: 80px;text-align: left" selectRow="false">
+                    <h:outputText value="#{engineer.region}"/>
+                </p:column>
+                <p:column headerText="技术能力介绍" style="width: 200px;text-align: left" selectRow="false">
+                    <h:outputText value="#{engineer.introduction}"/>
+                </p:column>
+
+                <p:column headerText="证书待审核数量" style="width: 100px;text-align: left" selectRow="false">
+                    <h:outputText value="#{engineer.certSumBef}"/>
+                </p:column>
+                <p:column headerText="已认证证书数量" style="width: 100px;text-align: left" selectRow="false">
+                    <h:outputText value="#{engineer.certSum}"/>
+                </p:column>
+                <p:column headerText="特殊状态" style="width: 100px;text-align: left" selectRow="false">
+                    <h:outputText value="#{ebEngineerListController.switchSpecialStatus(engineer.specialStatus)}"/>
+                </p:column>
+                <p:column headerText="注册源" style="width: 100px;text-align: left" selectRow="false">
+                    <h:outputText value="#{globalDataAndTransform.switchRegisterSource(engineer.registerSource)}"/>
+                </p:column>
+                <p:column headerText="注册时间" style="width: 130px;text-align: right" selectRow="false">
+                    <h:outputText value="#{engineer.createTime}">
+                        <f:convertDateTime pattern="yyyy-MM-dd HH:mm:ss" timeZone="GMT+8"/>
+                    </h:outputText>
+                </p:column>
+                <p:column headerText="认证时间" style="width: 130px;text-align: right" selectRow="false">
+                    <h:outputText value="#{engineer.certificationTime}">
+                        <f:convertDateTime pattern="yyyy-MM-dd HH:mm:ss" timeZone="GMT+8"/>
+                    </h:outputText>
+                </p:column>
+            </p:dataTable>
+
+        </h:form>
+        <h:form id="editDialog">
+            <p:dialog header="不可接单原因" widgetVar="auditInfo" ajax="false" style="width:250px">
+                <h:panelGrid columns="1" border="0" cellpadding="10" cellspacing="0">
+                    <h:inputTextarea id="reasonInfo" value="#{ebEngineerListController.acceptableNotReason}"
+                                     cols="30" rows="5" label="审核不通过原因" pt:placeholder="请输入原因，该工程师APP端点击报名时将会展示此原因。"/>
+
+                </h:panelGrid>
+                <div>提示:设置后该工程师将不能在工单市场上报名所有工单。</div>
+                <p:commandButton value="确认" action="#{ebEngineerListController.setSchAcceptableNot(0)}"
+                                 onclick="PF('auditInfo').hide()" style="margin-top: 10px;margin-left: 100px"
+                                 update="form"/>
+            </p:dialog>
+        </h:form>
+        <h:form id="viewDialog">
+            <p:dialog header="审核身份证照片" widgetVar="viewDialog" modal="true">
+                <h:panelGrid columns="2" border="0"
+                             cellpadding="10" cellspacing="0">
+                    <p:outputLabel value="姓名" for="realnameDecrypt" styleClass="col-sm-3 control-label"/>
+                    <h:outputText id="realnameDecrypt"
+                                  value="#{ebEngineerListController.showEbEngineer.decryptRealName}" pt:placeholder="">
+                    </h:outputText>
+                    <p:outputLabel value="身份证号" for="idcardDecrypt" styleClass="col-sm-3 control-label"/>
+                    <h:outputText id="idcardDecrypt" value="#{ebEngineerListController.showEbEngineer.decryptIdcard}"
+                                  pt:placeholder="">
+                    </h:outputText>
+                    <p:outputLabel value="证件照片" for="idcardPictureUrl" styleClass="col-sm-3 control-label"/>
+                    <p:graphicImage id="idcardPictureUrl"
+                                    value="#{ebEngineerListController.showEbEngineer.idCardPictureUrl}"
+                                    style="width: 400px;height: 300px">
+                    </p:graphicImage>
+                    <p:outputLabel value="审核操作" for="idcardApprovalStatue" styleClass="col-sm-3 control-label"/>
+                    <p:selectOneMenu id="idcardApprovalStatue" value="#{ebEngineerListController.realNameVerification}"
+                                     style="width: 180px">
+                        <f:selectItem itemLabel="待审核" itemValue="0"/>
+                        <f:selectItem itemLabel="审核通过" itemValue="1"/>
+                        <f:selectItem itemLabel="审核不通过" itemValue="-1"/>
+                        <p:ajax event="change" listener="#{ebEngineerListController.setEnableShows}"
+                                update="customerDescTab,customerDesc"/>
+                    </p:selectOneMenu>
+                    <p:outputLabel id="customerDescTab" value="审核不通过原因" for="customerDesc"
+                                   styleClass="col-sm-3 control-label"/>
+                    <h:inputTextarea id="customerDesc" rows="4" cols="30"
+                                     value="#{ebEngineerListController.notPassReason}"
+                                     disabled="#{ebEngineerListController.enableShow}"/>
+
+                </h:panelGrid>
+                <div style="margin-left: 200px;margin-top: 10px;margin-bottom: 30px">
+                    <p:commandButton value="确认" action="#{ebEngineerListController.verifyEbEngineerInfo}"
+                                     update=":form:test0,:form:growl" onclick="PF('viewDialog').hide()"/>
+                </div>
+            </p:dialog>
+        </h:form>
+
+        <p:dialog header="添加工程师备注" widgetVar="addRemarks" ajax="false" style="width:250px" modal="true">
+            <h:form id="addRemarksDialog">
+                <h:panelGrid columns="2" border="0" cellpadding="10" cellspacing="0">
+                    <p:outputLabel value="沟通状态" for="statusE" styleClass="col-sm-3 control-label" indicateRequired="true"/>
+                    <p:selectOneMenu id="statusE" value="#{ebEngineerListController.ebEngineerRemark.status}"
+                                     style="width: 180px">
+                        <f:selectItem itemLabel="请选择" itemValue=""/>
+                        <f:selectItems value="#{dictionaryController.getOptions('engineerRemarkStatus')}" var="typeCode" itemLabel="#{typeCode.name}" itemValue="#{typeCode.code}"/>
+                    </p:selectOneMenu>
+                    <p:outputLabel value="备注" for="remark" styleClass="col-sm-3 control-label" indicateRequired="true"/>
+                    <h:inputTextarea id="remark" value="#{ebEngineerListController.ebEngineerRemark.remark}"
+                                     cols="30" rows="5"  pt:placeholder="请填写备注"/>
+                </h:panelGrid>
+                <div style="float: right">
+                    <p:commandButton value="确认" action="#{ebEngineerListController.addEbEngineerRemark}"
+                                     update="form:growl"/>
+                    <p:commandButton value="关闭" onclick="PF('addRemarks').hide()" style="margin-right: 20px" update="form:growl"/>
+                </div>
+            </h:form>
+        </p:dialog>
+
+
+
+        <p:dialog header="添加工程师特殊状态" widgetVar="addStatus" ajax="false" style="width:250px" modal="true">
+            <h:form id="addStatusDialog">
+                <h:panelGrid columns="2" border="0" cellpadding="10" cellspacing="0">
+                    <p:outputLabel value="工程师状态" for="status" styleClass="col-sm-3 control-label" indicateRequired="true"/>
+                    <p:selectOneMenu id="status" value="#{ebEngineerListController.ebEngineerSpecialStatusRecord.specialStatus}"
+                                     style="width: 180px">
+                        <f:selectItem itemLabel="请选择" itemValue=""/>
+                        <f:selectItem itemLabel="提现需冲抵" itemValue="1"/>
+                        <f:selectItem itemLabel="内部工程师" itemValue="2"/>
+                    </p:selectOneMenu>
+                    <p:outputLabel value="备注" for="reason" styleClass="col-sm-3 control-label" indicateRequired="true"/>
+                    <h:inputTextarea id="reason" value="#{ebEngineerListController.ebEngineerSpecialStatusRecord.agreementNumber}"
+                                     cols="30" rows="5"  pt:placeholder="请输入协议编号"/>
+                </h:panelGrid>
+                <div style="float: right">
+                    <p:commandButton value="确认" action="#{ebEngineerListController.updateSpecialStatus(1)}"
+                                     update="form,:form:add,:form:remove"/>
+                    <p:commandButton value="关闭" onclick="PF('addStatus').hide()" style="margin-right: 20px" update="form,:form:add,:form:remove"/>
+                </div>
+            </h:form>
+        </p:dialog>
+
+        <p:dialog header="解除工程师特殊状态" widgetVar="removeStatus" ajax="false" style="width:250px" modal="true">
+            <h:form id="removeStatusDialog">
+                <h:panelGrid columns="2" border="0" cellpadding="10" cellspacing="0">
+                    <p:outputLabel value="工程师状态" for="type" styleClass="col-sm-3 control-label" indicateRequired="true"/>
+                    <p:selectOneMenu id="type" value="#{ebEngineerListController.ebEngineerSpecialStatusRecord.specialStatus}"
+                                     style="width: 180px" >
+                        <f:selectItem itemLabel="请选择" itemValue=""/>
+                        <f:selectItem itemLabel="提现需冲抵" itemValue="1"/>
+                        <f:selectItem itemLabel="内部工程师" itemValue="2"/>
+                    </p:selectOneMenu>
+                </h:panelGrid>
+                <div style="float: right">
+                    <p:commandButton value="确认" action="#{ebEngineerListController.updateSpecialStatus(0)}"
+                                     onclick="PF('addStatus').hide()" update="form,:form:add,:form:remove" style="margin-right: 20px"/>
+                </div>
+            </h:form>
+        </p:dialog>
+
+        <p:dialog header="设为领主" widgetVar="leaderDialog" ajax="false" style="width:300px" modal="true">
+            <h:form id="leaderForm">
+                <h:panelGrid columns="3" border="0" cellpadding="10" cellspacing="0">
+                    <p:outputLabel value="公司名称" for="companyName" styleClass="col-sm-3 control-label" indicateRequired="true"/>
+                    <p:inputText id="companyName"
+                                     value="#{ebEngineerListController.leaderCompany}" readonly="true"/>
+                    <p:commandButton oncomplete="PF('baseInfoListInfo').show()"
+                                     id="soIdBtn" action="#{ebEngineerListController.searchEnterpriseInfo}" update=":baseInfoForm"
+                                     image="ui-icon-search" style="border-radius: 0"/>
+                </h:panelGrid>
+                <div style="text-align: center;margin-top: 20px;">
+                    <p:commandButton value="取消"  onclick="PF('leaderDialog').hide()" style="margin-right: 10px"/>
+
+                    <p:commandButton value="确认" action="#{ebEngineerListController.setTeamLeader}" update=":form:growl,:form"/>
+
+                </div>
+            </h:form>
+        </p:dialog>
+
+        <p:dialog modal="true" header="企业信息" widgetVar="baseInfoListInfo" ajax="true" width="900px" height="550px">
+            <h:form id="baseInfoForm">
+                <p:tabView id="tabView" dynamic="true" cache="true">
+                    <p:tab title="企业信息库-查询">
+                        <p:toolbar>
+                            <f:facet name="left">
+                                <p:commandButton type="push" value="查询" image="fa fa-search"
+                                                 action="#{ebEngineerListController.searchEnterpriseInfo}" update="baseInfoTable" style="margin-bottom: 5px"/>
+                                <p:commandButton type="push" value="确定" action="#{ebEngineerListController.selectEnterpriseInfo}"
+                                                 update=":leaderForm:companyName :form:growl" onclick="PF('baseInfoListInfo').hide()"/>
+                            </f:facet>
+                        </p:toolbar>
+                        <h:panelGrid columns="6" border="0" cellpadding="10" cellspacing="0">
+                            <p:outputLabel value="企业名称" for="eiNames" styleClass="col-sm-3 control-label"/>
+                            <p:inputText id="eiNames"  value="#{ebEngineerListController.searchUuEnterpriseInfo.eiName}" />
+                            <p:outputLabel value="统一社会信用代码" for="eiUnifiedSocialCreditCodes" styleClass="col-sm-3 control-label"/>
+                            <p:inputText id="eiUnifiedSocialCreditCodes"  value="#{ebEngineerListController.searchUuEnterpriseInfo.eiUnifiedSocialCreditCode}" />
+                        </h:panelGrid>
+                        <p:dataTable id="baseInfoTable" value="#{ebEngineerListController.uuEnterpriseInfoList}" var="baseInfo"
+                                     rows="10"
+                                     emptyMessage=""
+                                     paginator="true"
+                                     lazy="true"
+                                     paginatorTemplate="{CurrentPageReport} {FirstPageLink} {PreviousPageLink} {PageLinks} {NextPageLink} {LastPageLink} {RowsPerPageDropdown}"
+                                     rowsPerPageTemplate="10,20,50"
+                                     editable="true"
+                                     editMode="cell"
+                                     rowKey="#{station.id}"
+                                     rowIndexVar="rowIndex"
+                                     paginatorPosition="bottom"
+                                     scrollWidth="100%"
+                                     scrollable="true"
+                                     rowSelectMode = "add"
+                                     selectionMode="single"
+                                     draggableColumns="true"
+                                     resizableColumns="true"
+                                     resizeMode="expand"
+                                     frozenColumns="1"
+                                     scrollHeight="400"
+                                     selection="#{ebEngineerListController.selectUuEnterpriseInfo}"
+                                     style="margin-top: 20px;"
+                        >
+                            <p:column headerText="序号" style="width:10px;text-align:right">
+                                <h:outputText value="#{rowIndex+1}"/>
+                            </p:column>
+                            <p:column headerText="企业名称" style="text-align:left;width:200px">
+                                <h:outputText value="#{baseInfo.eiName}"/>
+                            </p:column>
+                            <p:column headerText="统一社会信用代码" style="width: 150px;">
+                                <h:outputText value="#{baseInfo.eiUnifiedSocialCreditCode}" />
+                            </p:column>
+                            <p:column headerText="注册号" style="text-align:left;width:120px">
+                                <h:outputText value="#{baseInfo.eiRegNumber}"/>
+                            </p:column>
+                            <p:column headerText="组织结构代码"  style="text-align:left;width:100px">
+                                <h:outputText  value="#{baseInfo.eiOrgNumber}"/>
+                            </p:column>
+                            <p:column headerText="企业状态"  style="text-align:left;width:80px">
+                                <h:outputText  value="#{baseInfo.eiRegStatus}"/>
+                            </p:column>
+                        </p:dataTable>
+                    </p:tab>
+                    <p:tab title="天眼查-查询">
+                        <p:toolbar>
+                            <f:facet name="left">
+                                <p:commandButton type="push" value="查询" image="fa fa-search"
+                                                 action="#{ebEngineerListController.searchCompanyInfo}" update=":baseInfoForm :form:growl" style="margin-bottom: 5px"/>
+                                <p:commandButton type="push" value="添加" action="#{ebEngineerListController.createCompanyInfo}"
+                                                 update=":form:growl :baseInfoForm"/>
+                            </f:facet>
+                        </p:toolbar>
+                        <h:panelGrid columns="4" border="0" cellpadding="10" cellspacing="0">
+                            <p:outputLabel value="企业名称" for="nickName" styleClass="col-sm-3 control-label"/>
+                            <p:inputText id="nickName" value="#{ebEngineerListController.searchCompany}">
+                            </p:inputText>
+                        </h:panelGrid>
+                        <hr/>
+                        <h:panelGrid columns="4" border="0" cellpadding="10" cellspacing="0">
+                            <p:outputLabel value="名称(简称)：" for="eiName" styleClass="col-sm-3 control-label"/>
+                            <h:outputText id="eiName" value="#{ebEngineerListController.createUuEnterpriseInfo.eiName}"/>
+                            <p:outputLabel value="企业名称(英文)：" for="eiNameEn" styleClass="col-sm-3 control-label"/>
+                            <h:outputText id="eiNameEn" value="#{ebEngineerListController.createUuEnterpriseInfo.eiNameEn}"/>
+                            <p:outputLabel value="曾用名：" for="eiHistoryNames" styleClass="col-sm-3 control-label"/>
+                            <h:outputText id="eiHistoryNames" value="#{ebEngineerListController.createUuEnterpriseInfo.eiHistoryNames}"/>
+                            <p:outputLabel value="企业简称：" for="eiAlias" styleClass="col-sm-3 control-label"/>
+                            <h:outputText id="eiAlias" value="#{ebEngineerListController.createUuEnterpriseInfo.eiAlias}"/>
+                            <p:outputLabel value="社会统一信用代码：" for="eiUnifiedSocialCreditCode" styleClass="col-sm-3 control-label"/>
+                            <h:outputText id="eiUnifiedSocialCreditCode" value="#{ebEngineerListController.createUuEnterpriseInfo.eiUnifiedSocialCreditCode}"/>
+                            <p:outputLabel value="组织机构代码：" for="eiOrgNumber" styleClass="col-sm-3 control-label"/>
+                            <h:outputText id="eiOrgNumber" value="#{ebEngineerListController.createUuEnterpriseInfo.eiOrgNumber}"/>
+                            <p:outputLabel value="注册号：" for="eiRegNumber" styleClass="col-sm-3 control-label"/>
+                            <h:outputText id="eiRegNumber" value="#{ebEngineerListController.createUuEnterpriseInfo.eiRegNumber}"/>
+                            <p:outputLabel value="法定代表人名称：" for="eiLegalPersonName" styleClass="col-sm-3 control-label"/>
+                            <h:outputText id="eiLegalPersonName" value="#{ebEngineerListController.createUuEnterpriseInfo.eiLegalPersonName}"/>
+                            <p:outputLabel value="注册地址：" for="eiRegLocation" styleClass="col-sm-3 control-label"/>
+                            <h:outputText id="eiRegLocation" value="#{ebEngineerListController.createUuEnterpriseInfo.eiRegLocation}"/>
+
+                        </h:panelGrid>
+                        <h:panelGrid columns="4" border="0" cellpadding="10" cellspacing="0">
+                            <p:outputLabel value="经营范围：" for="eiBusinessScope" styleClass="col-sm-3 control-label"/>
+                            <h:outputText id="eiBusinessScope" value="#{ebEngineerListController.createUuEnterpriseInfo.eiBusinessScope}"/>
+                        </h:panelGrid>
+                    </p:tab>
+                </p:tabView>
+            </h:form>
+        </p:dialog>
+
+    </ui:define>
+</ui:composition>
+
+</html>
